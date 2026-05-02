@@ -1,0 +1,213 @@
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x1 (POWERON),boot:0x30f (SPI_FAST_FLASH_BOOT)
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x17c4
+load:0x4ff2abd0,len:0x1010
+load:0x4ff2cbd0,len:0x3420
+entry 0x4ff2abda
+I (25) boot: ESP-IDF v5.4.3 2nd stage bootloader
+I (26) boot: compile time May  1 2026 05:27:22
+I (26) boot: Multicore bootloader
+I (27) boot: chip revision: v1.3
+I (29) boot: efuse block revision: v0.3
+I (32) qio_mode: Enabling default flash chip QIO
+I (37) boot.esp32p4: SPI Speed      : 80MHz
+I (40) boot.esp32p4: SPI Mode       : QIO
+I (44) boot.esp32p4: SPI Flash Size : 16MB
+I (48) boot: Enabling RNG early entropy source...
+I (53) boot: Partition Table:
+I (55) boot: ## Label            Usage          Type ST Offset   Length
+I (62) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (68) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (75) boot:  2 factory          factory app      00 00 00010000 00400000
+I (81) boot:  3 storage          Unknown data     01 81 00410000 00600000
+I (89) boot: End of partition table
+I (91) esp_image: segment 0: paddr=00010020 vaddr=48100020 size=25b2f0h (2470640) map
+I (477) esp_image: segment 1: paddr=0026b318 vaddr=30100000 size=00068h (   104) load
+I (478) esp_image: segment 2: paddr=0026b388 vaddr=4ff00000 size=04c90h ( 19600) load
+I (485) esp_image: segment 3: paddr=00270020 vaddr=48000020 size=f8ee0h (1019616) map
+I (645) esp_image: segment 4: paddr=00368f08 vaddr=4ff04c90 size=15fe0h ( 90080) load
+I (663) esp_image: segment 5: paddr=0037eef0 vaddr=4ff1ac80 size=040bch ( 16572) load
+I (672) boot: Loaded app from partition at offset 0x10000
+I (673) boot: Disabling RNG early entropy source...
+I (685) hex_psram: vendor id    : 0x0d (AP)
+I (685) hex_psram: Latency      : 0x01 (Fixed)
+I (685) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (686) hex_psram: dev id       : 0x03 (generation 4)
+I (691) hex_psram: density      : 0x07 (256 Mbit)
+I (695) hex_psram: good-die     : 0x06 (Pass)
+I (699) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (704) hex_psram: BurstType    : 0x00 ( Wrap)
+I (708) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (713) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (717) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (722) hex_psram: DriveStrength: 0x00 (1/1)
+I (726) MSPI DQS: tuning success, best phase id is 0
+I (898) MSPI DQS: tuning success, best delayline id is 17
+I esp_psram: Found 32MB PSRAM device
+I esp_psram: Speed: 200MHz
+I (1016) mmu_psram: .rodata xip on psram
+I (1065) mmu_psram: .text xip on psram
+I (1066) hex_psram: psram CS IO is dedicated
+I (1066) cpu_start: Multicore app
+I (1480) esp_psram: SPI SRAM memory test OK
+I (1489) cpu_start: Pro cpu start user code
+I (1489) cpu_start: cpu freq: 360000000 Hz
+I (1489) app_init: Application information:
+I (1490) app_init: Project name:     .
+I (1493) app_init: App version:      8da0938-dirty
+I (1498) app_init: Compile time:     May  1 2026 05:27:05
+I (1503) app_init: ELF file SHA256:  4feff203b...
+I (1507) app_init: ESP-IDF:          v5.4.3
+I (1511) efuse_init: Min chip rev:     v0.1
+I (1515) efuse_init: Max chip rev:     v1.99
+I (1519) efuse_init: Chip rev:         v1.3
+I (1523) heap_init: Initializing. RAM available for dynamic allocation:
+I (1529) heap_init: At 4FF25FE0 len 00014FE0 (83 KiB): RAM
+I (1534) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (1540) heap_init: At 4FF40000 len 00040000 (256 KiB): RAM
+I (1545) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM
+I (1550) heap_init: At 30100068 len 00001F98 (7 KiB): TCM
+I (1556) esp_psram: Adding pool of 29312K of PSRAM memory to heap allocator
+I (1562) esp_psram: Adding pool of 28K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator
+I (1573) esp_psram: Adding pool of 19K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator
+I (1585) spi_flash: detected chip: gd
+I (1588) spi_flash: flash io: qio
+I (1591) host_init: ESP Hosted : Host chip_ip[18]
+I (1606) H_API: ESP-Hosted starting. Hosted_Tasks: prio:23, stack: 5120 RPC_task_stack: 5120
+I (1606) H_API: ** add_esp_wifi_remote_channels **
+I (1609) gpio: GPIO[18]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0
+I (1617) gpio: GPIO[19]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 
+I (1625) gpio: GPIO[14]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0
+I (1634) gpio: GPIO[15]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 
+I (1642) gpio: GPIO[16]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 
+I (1650) gpio: GPIO[17]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0
+I (1660) H_SDIO_DRV: sdio_data_to_rx_buf_task started
+I (1664) main_task: Started on CPU0
+I (1668) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (1675) main_task: Calling app_main()
+I (1679) MAIN: System boot
+W (1685) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1697) I2C_BUS: I2C bus initialized
+W (1700) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1715) I2C1_BUS: I2C1 bus initialized
+I (1719) DS3231: DS3231 initialized
+I (1723) DS3231: STATUS REG = 0x08
+I (1726) DS3231_RAW: REGS: 09 57 06 05 01 05 26
+I (1730) RTC: Loaded time from DS3231
+I (1733) transport: Attempt connection with slave: retry[0]
+W (1738) H_SDIO_DRV: Reset slave using GPIO[54]
+I (1742) os_wrapper_esp: GPIO [54] configured
+I (1746) gpio: GPIO[54]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0
+I (3275) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[20000 KHz]
+I (3275) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+I (3279) sdio_wrapper: Queues: Tx[4] Rx[4] SDIO-Rx-Mode[1]
+I (3316) gpio: GPIO[15]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 
+I (3317) gpio: GPIO[17]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0
+I (3322) sdio_wrapper: Function 0 Blocksize: 512
+I (3326) sdio_wrapper: Function 1 Blocksize: 512
+I (3430) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE
+I (3430) transport: set_transport_state: 1
+I (3430) transport: Waiting for esp_hosted slave to be ready
+I (3460) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+I (3460) H_SDIO_DRV: Open data path at slave
+I (3460) H_SDIO_DRV: Starting SDIO process rx task
+I (3487) H_SDIO_DRV: Received ESP_PRIV_IF type message
+I (3487) transport: Received INIT event from ESP32 peripheral
+I (3488) transport: EVENT: 12
+I (3489) transport: Identified slave [esp32c6]
+W (3493) H_SDIO_DRV: SDIO clock freq set to [20000]KHz, Max possible (on PCB) is 40000KHz
+I (3501) transport: SDIO mode: slave: streaming, host: streaming
+I (3507) transport: EVENT: 11
+I (3510) transport: capabilities: 0xd
+I (3513) transport: Features supported are:
+I (3517) transport:      * WLAN
+I (3520) transport:        - HCI over SDIO
+I (3523) transport:        - BLE only
+I (3526) transport: EVENT: 13
+I (3529) transport: ESP board type is : 13 
+
+I (3533) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE
+I (3539) H_API: Transport active
+I (3542) transport: Slave chip Id[12]
+I (3545) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80]
+I (3551) transport: transport_delayed_init
+I (3555) esp_cli: Registering command: crash
+I (3559) esp_cli: Registering command: reboot
+I (3563) esp_cli: Registering command: mem-dump
+I (3567) esp_cli: Registering command: task-dump
+I (3571) esp_cli: Registering command: cpu-dump
+I (3576) esp_cli: Registering command: heap-trace
+I (3580) esp_cli: Registering command: sock-dump
+I (3584) esp_cli: Registering command: host-power-save
+I (3589) hci_stub_drv: Host BT Support: Disabled
+I (3594) H_SDIO_DRV: Received INIT event
+I (3597) H_SDIO_DRV: Event type: 0x22
+I (3601) H_SDIO_DRV: Write thread started
+I (3960) H_API: esp_wifi_remote_connect
+I (4991) WIFI: Retry connect...
+I (4991) H_API: esp_wifi_remote_connect
+I (5016) TIME_SYNC: Initializing time sync
+I (5016) TIME_SYNC: Timezone set by GPS: EET-2EEST,M3.5.0/3,M10.5.0/4
+I (5016) TIME_SYNC: Loaded TZ from stored coords: 42.677059 23.372335
+I (5022) DS3231_RAW: REGS: 12 57 06 05 01 05 26
+I (5026) TIME_SYNC: RTC time loaded (UTC)
+I (5029) TIME_SYNC: Time loaded from RTC
+I (5033) display: Display init (ADAPTED)
+I (5238) jd9365: version: 2.0.2
+I (5379) jd9365: LCD ID: 93 65 04
+I (5521) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+I (5521) GT911: TouchPad_ID:0x39,0x32,0x37
+I (5521) GT911: TouchPad_Config_Version:130
+I (5525) display: Initializing LVGL
+I (5528) LVGL: Starting LVGL task
+I (5531) display: Registering display (800x1280 physical, landscape via sw_rotate)
+E (5540) lcd_panel: esp_lcd_panel_swap_xy(50): swap_xy is not supported by this panel
+I (5546) display: Display set to landscape (1280x800)
+I (5551) display: Registering touch input
+I (5555) display: LVGL initialized
+I (5558) display: ===== Display subsystem ready =====
+I (5618) audio_manager: Initializing Audio Manager...
+I (5619) gpio: GPIO[53]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0
+I (5626) ES8311: Work in Slave mode
+I (5629) I2S_IF: Paired data: 0x4ff3fb04, current mode: playback, paired in_enable: 0, paired out_enable: 0
+I (5633) I2S_IF: STD: TX, data_bit: 16, slot_bit: 16, ws_width: 16, slot_mode: STEREO, slot_mask: 0x3
+I (5642) I2S_IF: STD: TX, sample_rate_hz: 48000, mclk_multiple: 256, clk_src: 16
+I (5664) Adev_Codec: Open codec device OK
+I (5666) audio_manager: Audio Manager ready
+E (5666) audio_manager: Cannot open WAV: /spiflash/audio/system/done.wav
+I (7166) SCD41: Start OK
+I (12591) H_API: esp_wifi_remote_connect
+I (15166) SCD41: SCD41 init DONE
+I (15167) CALIB: Calibration loaded
+I (15167) MAIN: Calibrating MPU6050...
+I (15314) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x480af836
+--- 0x480af836: wifi_sta_receive at D:/Espresiv/v5.4.3/esp-idf/components/esp_wifi/src/wifi_netif.c:39
+I (18071) GPS: GPS UART initialized (GN02D)
+I (18071) gpio: GPIO[1]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 
+I (18072) POWER: Power manager initialized
+I (18076) TIME_SYNC: Time sync task started
+⏳ Waiting for WiFi...
+✅ INA3221 init OK
+I (18084) VICTRON: Victron UART2 initialized (RX=45)
+✅ MPU6050 init OK
+Loaded calibration: pitch=71.32 roll=40.92
+I (18094) gpio: GPIO[2]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0
+GPIO level: 1
+I (18100) MAIN: System ready
+I (18223) DS18B20: DS18B20 #0 found
+I (18223) DS18B20: Total sensors detected: 1
+I (18223) DS18B20: Found ROM: 0x693CE104572AB328
+I (18224) DS18B20: Mapped Test → index 0
+I (18517) esp_netif_handlers: sta ip: 192.168.1.123, mask: 255.255.255.0, gw: 192.168.1.1
+I (19583) SCD41: Start OK
+💾 Using stored coords: 42.677059, 23.372335
+I (23296) esp-x509-crt-bundle: Certificate validated
+I (23726) WEATHER_HTTP: Weather FULL parsed OK
+I (23740) hourly_chart: lv_hourly_chart_create
+I (23741) daily_chart: lv_daily_chart_create
+I (23741) UI_WEATHER: Weather UI updated
+I (27583) SCD41: SCD41 init DONE
+✅ SCD41 init OK
+✅ MPU calibrated and saved: pitch=51.99 roll=50.22
