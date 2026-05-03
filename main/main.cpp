@@ -24,6 +24,9 @@ extern "C" {
 #include "wifi.h"
 #include "time_sync.h"
 
+
+
+
 // TASKS
 #include "time_task.h"
 #include "weather_task.h"
@@ -186,6 +189,7 @@ extern "C" void app_main(void)
         ESP_LOGI("WIFI", "Retry connect...");
         esp_wifi_connect();
     }
+
 
     time_sync_init();
 

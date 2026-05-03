@@ -19,5 +19,6 @@ idf_component_register(
         core
         ui
         audio
+        ota
         
 )

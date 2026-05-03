@@ -10,6 +10,7 @@ idf_component_register(
         logic
         audio
         sdcard
+        ota
        
         
 )

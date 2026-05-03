@@ -57,14 +57,13 @@ esp_err_t ds18b20_init(void)
 
     ds18b20_config_t cfg = {};
 
-    while (onewire_device_iter_get_next(iter, &device) == ESP_OK && sensor_count < MAX_SENSORS)
+    while (onewire_device_iter_get_next(iter, &device) == ESP_OK &&
+           sensor_count < MAX_SENSORS)
     {
-        ESP_ERROR_CHECK(
-            ds18b20_new_device_from_enumeration(&device, &cfg, &devs[sensor_count])
-        );
-
-        ESP_LOGI(TAG, "DS18B20 #%d found", sensor_count);
-        sensor_count++;
+        if (ds18b20_new_device_from_enumeration(&device, &cfg, &devs[sensor_count]) == ESP_OK) {
+            ESP_LOGI(TAG, "DS18B20 #%d found", sensor_count);
+            sensor_count++;
+        }
     }
 
     onewire_del_device_iter(iter);
@@ -107,16 +106,26 @@ esp_err_t ds18b20_read_all(float *temps, int max_count)
 {
     if (sensor_count == 0) return ESP_FAIL;
 
-    ESP_ERROR_CHECK(
-        ds18b20_trigger_temperature_conversion_for_all(bus)
-    );
-
+    ds18b20_trigger_temperature_conversion_for_all(bus);
     vTaskDelay(pdMS_TO_TICKS(750));
 
     for (int i = 0; i < sensor_count && i < max_count; i++) {
-        ESP_ERROR_CHECK(
-            ds18b20_get_temperature(devs[i], &temps[i])
-        );
+
+        esp_err_t err = ds18b20_get_temperature(devs[i], &temps[i]);
+
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Sensor %d read error: %s",
+                     i, esp_err_to_name(err));
+
+            temps[i] = -127.0f;   // безопасна грешка
+            continue;
+        }
+
+        // Филтър за грешни стойности
+        if (temps[i] == 85.0f || temps[i] < -55.0f || temps[i] > 125.0f) {
+            ESP_LOGW(TAG, "Sensor %d invalid value: %.2f", i, temps[i]);
+            temps[i] = -127.0f;
+        }
     }
 
     return ESP_OK;

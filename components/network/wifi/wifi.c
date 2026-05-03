@@ -8,6 +8,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "ota_update.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -80,8 +81,13 @@ static void wifi_event_handler(void *arg,
             sprintf(wifi_ip, IPSTR, IP2STR(&ip.ip));
 
             ui_update_wifi_icon();
-
             wifi_roaming_resume();
+
+             // ⭐⭐ ТУК ДОБАВЯШ OTA ⭐⭐
+             ESP_LOGI(TAG, "WiFi connected, starting OTA server...");
+             ota_start_server();
+
+
         }
     }
 }
