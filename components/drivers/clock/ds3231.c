@@ -1,14 +1,53 @@
 #include "ds3231.h"
 #include "esp_log.h"
-#include "i2c_bus1.h"   // <-- важно
+#include "i2c_bus1.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 
 #define DS3231_ADDR 0x68
 
 static const char *TAG = "DS3231";
 
 static i2c_master_dev_handle_t ds3231_dev = NULL;
-extern i2c_master_bus_handle_t g_i2c1_bus;   // <-- важно
+extern i2c_master_bus_handle_t g_i2c1_bus;
 
+/* =========================================================
+   SAFE I2C HELPERS
+   ========================================================= */
+static esp_err_t ds_safe_tx(const uint8_t *data, size_t len)
+{
+    for (int i = 0; i < 3; i++) {
+        esp_err_t err = i2c_master_transmit(ds3231_dev, data, len, 100);
+        if (err == ESP_OK) return ESP_OK;
+
+        ESP_LOGW(TAG, "TX failed (%s), retry %d/3",
+                 esp_err_to_name(err), i + 1);
+
+        i2c_master_bus_reset(g_i2c1_bus);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    return ESP_FAIL;
+}
+
+static esp_err_t ds_safe_rx(uint8_t *data, size_t len)
+{
+    for (int i = 0; i < 3; i++) {
+        esp_err_t err = i2c_master_receive(ds3231_dev, data, len, 100);
+        if (err == ESP_OK) return ESP_OK;
+
+        ESP_LOGW(TAG, "RX failed (%s), retry %d/3",
+                 esp_err_to_name(err), i + 1);
+
+        i2c_master_bus_reset(g_i2c1_bus);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    return ESP_FAIL;
+}
+
+/* =========================================================
+   BCD helpers
+   ========================================================= */
 static uint8_t bcd2bin(uint8_t val)
 {
     return (val & 0x0F) + ((val >> 4) * 10);
@@ -19,6 +58,9 @@ static uint8_t bin2bcd(uint8_t val)
     return ((val / 10) << 4) | (val % 10);
 }
 
+/* =========================================================
+   INIT
+   ========================================================= */
 bool ds3231_init(void)
 {
     if (ds3231_dev != NULL)
@@ -42,19 +84,22 @@ bool ds3231_init(void)
 
     ESP_LOGI(TAG, "DS3231 initialized");
 
-    // Read status register
+    // Read status register (safe)
     uint8_t reg = 0x0F;
     uint8_t status = 0;
 
-    if (i2c_master_transmit(ds3231_dev, &reg, 1, -1) == ESP_OK &&
-        i2c_master_receive(ds3231_dev, &status, 1, -1) == ESP_OK)
+    if (ds_safe_tx(&reg, 1) == ESP_OK &&
+        ds_safe_rx(&status, 1) == ESP_OK)
     {
-        ESP_LOGI("DS3231", "STATUS REG = 0x%02X", status);
+        ESP_LOGI(TAG, "STATUS REG = 0x%02X", status);
     }
 
     return true;
 }
 
+/* =========================================================
+   READ TIME
+   ========================================================= */
 bool ds3231_get_time(struct tm *out)
 {
     if (!out) return false;
@@ -63,10 +108,10 @@ bool ds3231_get_time(struct tm *out)
     uint8_t buf[7];
     uint8_t reg = 0x00;
 
-    if (i2c_master_transmit(ds3231_dev, &reg, 1, -1) != ESP_OK)
+    if (ds_safe_tx(&reg, 1) != ESP_OK)
         return false;
 
-    if (i2c_master_receive(ds3231_dev, buf, sizeof(buf), -1) != ESP_OK)
+    if (ds_safe_rx(buf, sizeof(buf)) != ESP_OK)
         return false;
 
     ESP_LOGI("DS3231_RAW",
@@ -84,6 +129,9 @@ bool ds3231_get_time(struct tm *out)
     return true;
 }
 
+/* =========================================================
+   SET TIME
+   ========================================================= */
 bool ds3231_set_time(const struct tm *in)
 {
     if (!in) return false;
@@ -99,7 +147,7 @@ bool ds3231_set_time(const struct tm *in)
     data[6] = bin2bcd(in->tm_mon + 1);
     data[7] = bin2bcd(in->tm_year - 100);
 
-    if (i2c_master_transmit(ds3231_dev, data, sizeof(data), -1) != ESP_OK) {
+    if (ds_safe_tx(data, sizeof(data)) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write DS3231 time");
         return false;
     }
@@ -108,6 +156,9 @@ bool ds3231_set_time(const struct tm *in)
     return true;
 }
 
+/* =========================================================
+   FORCE SET
+   ========================================================= */
 void ds3231_force_set(int year, int month, int day, int hour, int min, int sec)
 {
     struct tm t = {
@@ -121,9 +172,9 @@ void ds3231_force_set(int year, int month, int day, int hour, int min, int sec)
     };
 
     if (ds3231_set_time(&t)) {
-        ESP_LOGW("DS3231", "MANUAL SET DONE → %04d-%02d-%02d %02d:%02d:%02d",
+        ESP_LOGW(TAG, "MANUAL SET DONE → %04d-%02d-%02d %02d:%02d:%02d",
                  year, month, day, hour, min, sec);
     } else {
-        ESP_LOGE("DS3231", "MANUAL SET FAILED");
+        ESP_LOGE(TAG, "MANUAL SET FAILED");
     }
 }

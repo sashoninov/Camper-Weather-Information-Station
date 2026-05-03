@@ -1,7 +1,6 @@
 #include "mpu6050.h"
-#include "i2c_bus1.h"   // или i2c_bus.h ако е на I2C0
+#include "i2c_bus1.h"
 #include "esp_log.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <math.h>
@@ -11,8 +10,10 @@
 #define REG_PWR_MGMT_1   0x6B
 #define REG_ACCEL_XOUT   0x3B
 
+static const char *TAG = "MPU6050";
+
 static i2c_master_dev_handle_t dev;
-extern i2c_master_bus_handle_t g_i2c1_bus;   // смени на g_i2c_bus ако е на I2C0
+extern i2c_master_bus_handle_t g_i2c1_bus;
 
 /* =========================================================
    INIT
@@ -25,16 +26,58 @@ esp_err_t mpu6050_init(void)
         .scl_speed_hz = 400000,
     };
 
-    ESP_ERROR_CHECK(i2c_master_bus_add_device(g_i2c1_bus, &cfg, &dev));
+    esp_err_t err = i2c_master_bus_add_device(g_i2c1_bus, &cfg, &dev);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add device: %s", esp_err_to_name(err));
+        return err;
+    }
 
     uint8_t data[2] = {REG_PWR_MGMT_1, 0x00};
-    ESP_ERROR_CHECK(i2c_master_transmit(dev, data, 2, 100));
+    err = i2c_master_transmit(dev, data, 2, 100);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to wake MPU6050: %s", esp_err_to_name(err));
+        return err;
+    }
 
+    ESP_LOGI(TAG, "MPU6050 initialized");
     return ESP_OK;
 }
 
 /* =========================================================
-   READ
+   SAFE I2C READ WITH RETRY + BUS RESET
+   ========================================================= */
+static esp_err_t mpu_i2c_safe_transmit(const uint8_t *data, size_t len)
+{
+    for (int i = 0; i < 3; i++) {
+        esp_err_t err = i2c_master_transmit(dev, data, len, 100);
+        if (err == ESP_OK) return ESP_OK;
+
+        ESP_LOGW(TAG, "I2C transmit failed (%s), retry %d/3",
+                 esp_err_to_name(err), i + 1);
+
+        i2c_master_bus_reset(g_i2c1_bus);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    return ESP_FAIL;
+}
+
+static esp_err_t mpu_i2c_safe_receive(uint8_t *data, size_t len)
+{
+    for (int i = 0; i < 3; i++) {
+        esp_err_t err = i2c_master_receive(dev, data, len, 100);
+        if (err == ESP_OK) return ESP_OK;
+
+        ESP_LOGW(TAG, "I2C receive failed (%s), retry %d/3",
+                 esp_err_to_name(err), i + 1);
+
+        i2c_master_bus_reset(g_i2c1_bus);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    return ESP_FAIL;
+}
+
+/* =========================================================
+   READ (SAFE)
    ========================================================= */
 esp_err_t mpu6050_read(mpu6050_data_t *out)
 {
@@ -42,11 +85,20 @@ esp_err_t mpu6050_read(mpu6050_data_t *out)
     uint8_t data[14];
 
     // Set register pointer
-    ESP_ERROR_CHECK(i2c_master_transmit(dev, &reg, 1, 100));
+    esp_err_t err = mpu_i2c_safe_transmit(&reg, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set register pointer");
+        return err;
+    }
+
     vTaskDelay(pdMS_TO_TICKS(2));
 
     // Read 14 bytes
-    ESP_ERROR_CHECK(i2c_master_receive(dev, data, 14, 100));
+    err = mpu_i2c_safe_receive(data, 14);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read sensor data");
+        return err;
+    }
 
     int16_t ax = (data[0] << 8) | data[1];
     int16_t ay = (data[2] << 8) | data[3];
@@ -82,7 +134,7 @@ void mpu6050_calibrate(void)
     for (int i = 0; i < samples; i++)
     {
         mpu6050_data_t d;
-        mpu6050_read(&d);
+        if (mpu6050_read(&d) != ESP_OK) continue;
 
         float pitch = atan2f(d.ay, d.az) * 57.2958f;
         float roll  = atan2f(-d.ax, sqrtf(d.ay * d.ay + d.az * d.az)) * 57.2958f;
@@ -102,7 +154,10 @@ void mpu6050_calibrate(void)
 mpu_angles_t mpu6050_get_angles(void)
 {
     mpu6050_data_t d;
-    mpu6050_read(&d);
+    if (mpu6050_read(&d) != ESP_OK) {
+        mpu_angles_t zero = {0};
+        return zero;
+    }
 
     return mpu6050_get_angles_from_data(&d);
 }

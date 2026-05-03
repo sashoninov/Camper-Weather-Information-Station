@@ -3,18 +3,47 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "driver/i2c_master.h"
-#include "i2c_bus1.h"   // <-- важно
+#include "i2c_bus1.h"
 
 #define SCD41_ADDR 0x62
 
 static const char *TAG = "SCD41";
 
 static i2c_master_dev_handle_t dev;
-extern i2c_master_bus_handle_t g_i2c1_bus;   // <-- важно
+extern i2c_master_bus_handle_t g_i2c1_bus;
 
-// =========================
-// CRC
-// =========================
+/* =========================================================
+   SAFE I2C HELPERS
+   ========================================================= */
+static esp_err_t scd41_safe_tx(const uint8_t *data, size_t len)
+{
+    for (int i = 0; i < 3; i++) {
+        esp_err_t err = i2c_master_transmit(dev, data, len, 100);
+        if (err == ESP_OK) return ESP_OK;
+
+        ESP_LOGW(TAG, "TX failed (%s), retry %d/3", esp_err_to_name(err), i + 1);
+        i2c_master_bus_reset(g_i2c1_bus);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    return ESP_FAIL;
+}
+
+static esp_err_t scd41_safe_rx(uint8_t *data, size_t len)
+{
+    for (int i = 0; i < 3; i++) {
+        esp_err_t err = i2c_master_receive(dev, data, len, 100);
+        if (err == ESP_OK) return ESP_OK;
+
+        ESP_LOGW(TAG, "RX failed (%s), retry %d/3", esp_err_to_name(err), i + 1);
+        i2c_master_bus_reset(g_i2c1_bus);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    return ESP_FAIL;
+}
+
+/* =========================================================
+   CRC
+   ========================================================= */
 static uint8_t scd41_crc(uint8_t *data)
 {
     uint8_t crc = 0xFF;
@@ -27,29 +56,29 @@ static uint8_t scd41_crc(uint8_t *data)
     return crc;
 }
 
-// =========================
-// DATA READY
-// =========================
+/* =========================================================
+   DATA READY
+   ========================================================= */
 static bool scd41_data_ready(void)
 {
     uint8_t cmd[] = {0xE4, 0xB8};
     uint8_t data[3];
 
-    if (i2c_master_transmit(dev, cmd, 2, 100) != ESP_OK)
+    if (scd41_safe_tx(cmd, 2) != ESP_OK)
         return false;
 
     vTaskDelay(pdMS_TO_TICKS(2));
 
-    if (i2c_master_receive(dev, data, 3, 100) != ESP_OK)
+    if (scd41_safe_rx(data, 3) != ESP_OK)
         return false;
 
     uint16_t ready = (data[0] << 8) | data[1];
     return (ready & 0x07FF) != 0;
 }
 
-// =========================
-// INIT
-// =========================
+/* =========================================================
+   INIT
+   ========================================================= */
 esp_err_t scd41_init(void)
 {
     i2c_device_config_t cfg = {
@@ -58,40 +87,38 @@ esp_err_t scd41_init(void)
         .scl_speed_hz = 100000,
     };
 
-    ESP_ERROR_CHECK(i2c_master_bus_add_device(g_i2c1_bus, &cfg, &dev));
+    esp_err_t err = i2c_master_bus_add_device(g_i2c1_bus, &cfg, &dev);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add SCD41 device: %s", esp_err_to_name(err));
+        return err;
+    }
 
-    // SOFT RESET
     uint8_t reset_cmd[] = {0x36, 0x46};
-    i2c_master_transmit(dev, reset_cmd, 2, 100);
+    scd41_safe_tx(reset_cmd, 2);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    // STOP measurement
     uint8_t stop_cmd[] = {0x3F, 0x86};
-    i2c_master_transmit(dev, stop_cmd, 2, 100);
+    scd41_safe_tx(stop_cmd, 2);
     vTaskDelay(pdMS_TO_TICKS(500));
 
-    // START measurement
     uint8_t start_cmd[] = {0x21, 0xB1};
-    for (int i = 0; i < 5; i++)
-    {
-        if (i2c_master_transmit(dev, start_cmd, 2, 100) == ESP_OK)
-        {
+    for (int i = 0; i < 5; i++) {
+        if (scd41_safe_tx(start_cmd, 2) == ESP_OK) {
             ESP_LOGI(TAG, "Start OK");
             break;
         }
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 
-    // WAIT FOR FIRST DATA
     vTaskDelay(pdMS_TO_TICKS(8000));
 
     ESP_LOGI(TAG, "SCD41 init DONE");
     return ESP_OK;
 }
 
-// =========================
-// READ
-// =========================
+/* =========================================================
+   READ
+   ========================================================= */
 esp_err_t scd41_read(uint16_t *co2, float *temp, float *hum)
 {
     if (!scd41_data_ready())
@@ -100,15 +127,14 @@ esp_err_t scd41_read(uint16_t *co2, float *temp, float *hum)
     uint8_t cmd[] = {0xEC, 0x05};
     uint8_t data[9];
 
-    if (i2c_master_transmit(dev, cmd, 2, 100) != ESP_OK)
+    if (scd41_safe_tx(cmd, 2) != ESP_OK)
         return ESP_FAIL;
 
     vTaskDelay(pdMS_TO_TICKS(2));
 
-    if (i2c_master_receive(dev, data, 9, 100) != ESP_OK)
+    if (scd41_safe_rx(data, 9) != ESP_OK)
         return ESP_FAIL;
 
-    // CRC
     if (scd41_crc(&data[0]) != data[2]) return ESP_FAIL;
     if (scd41_crc(&data[3]) != data[5]) return ESP_FAIL;
     if (scd41_crc(&data[6]) != data[8]) return ESP_FAIL;
