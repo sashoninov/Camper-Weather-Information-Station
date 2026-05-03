@@ -4,8 +4,8 @@
 // ====================== CONFIG ======================
 
 // Батерия AGM
-#define BATT_MIN_V 11.8f
-#define BATT_MAX_V 12.8f
+#define BATT_MIN_V 11.7f
+#define BATT_MAX_V 12.7f
 
 // Чиста вода (литри)
 #define CLEAN_WATER_MAX 80.0f
