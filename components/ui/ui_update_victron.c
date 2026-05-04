@@ -3,6 +3,7 @@
 
 #include "audio_manager.h"
 #include "audio_events.h"
+#include "status.h"
 
 // 🔋 Battery % функция (12V система)
 static int battery_percent(float v)
@@ -23,6 +24,10 @@ void ui_update_victron(void)
     {
         float v = app_state.battery_voltage;
         int percent = battery_percent(v);
+
+        // camper battery Web
+        g_status.camper_v = v;
+        g_status.camper_a = app_state.battery_current;
 
         // 🔋 Battery Voltage
         lv_label_set_text_fmt(ui_CampBattery, "%.1f", v);

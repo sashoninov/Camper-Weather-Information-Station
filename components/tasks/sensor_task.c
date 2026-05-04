@@ -12,6 +12,8 @@
 #include "scd41.h"
 #include "app_state.h"
 #include "calibration.h"
+#include "status.h"
+
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -91,6 +93,8 @@ void sensor_task(void *arg)
                 app_state.ina_voltage[2] = ina.voltage[2];
 
                 float ch1 = ina.voltage[0];
+                g_status.starter_v = ch1;
+
                 float ch2 = ina.voltage[1];
                 float ch3 = ina.voltage[2];
 
@@ -165,6 +169,10 @@ void sensor_task(void *arg)
 
             pitch_f = pitch_f * 0.9f + a.pitch * 0.1f;
             roll_f  = roll_f * 0.9f + a.roll * 0.1f;
+
+            g_status.pitch = pitch_f;
+            g_status.roll  = roll_f;
+
 
             app_state.mpu.pitch = pitch_f;
             app_state.mpu.roll  = roll_f;

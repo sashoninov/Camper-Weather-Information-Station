@@ -8,7 +8,7 @@ idf_component_register(
         "charts"
         "weather"
 		"config"
-    REQUIRES lvgl core network  audio
+    REQUIRES lvgl core network  audio ota
 )
 
 # 🔥 FIX за SquareLine

@@ -13,5 +13,5 @@ idf_component_register(
         
 
     INCLUDE_DIRS "."
-    REQUIRES core ui logic network driver
+    REQUIRES core ui logic network driver ota
 )
