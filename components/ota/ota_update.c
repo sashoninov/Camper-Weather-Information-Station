@@ -290,7 +290,7 @@ static esp_err_t panel_get_handler(httpd_req_t *req)
 "  let a=j.camper_a;"
 "  document.getElementById('camper_a').textContent=(a>=0?'+':'')+a.toFixed(2)+' A';"
 
-"  updateLevel(j.pitch,j.roll);"
+"  updateLevel(j.roll,j.pitch);"
 
 "  let up=j.uptime;"
 "  let h=Math.floor(up/3600);"
