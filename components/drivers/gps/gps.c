@@ -6,8 +6,8 @@
 #include <stdlib.h>
 
 #define UART_PORT UART_NUM_1
-#define TX_PIN    21
-#define RX_PIN    22
+#define TX_PIN    22
+#define RX_PIN    21
 #define BUF_SIZE  2048
 
 static const char *TAG = "GPS";

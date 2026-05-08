@@ -84,7 +84,7 @@ void ui_update_weather(void * param)
     }
 
     // ================= CURRENT =================
-    lv_label_set_text_fmt(ui_TempCurrent, "%.1f", app_state.weather.current_temp);
+    //lv_label_set_text_fmt(ui_TempCurrent, "%.1f", app_state.weather.current_temp);
 
     if (ui_WindSpeedCurrent)
         lv_label_set_text_fmt(ui_WindSpeedCurrent, "%.1f", app_state.weather.wind_speed);

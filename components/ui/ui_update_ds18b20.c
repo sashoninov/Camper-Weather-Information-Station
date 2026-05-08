@@ -9,14 +9,14 @@
 void ui_update_ds18b20(void)
 {
     //// Temp Vun
-    //if (app_state.ds_valid[0])
-    //    lv_label_set_text_fmt(ui_LabelTempVun, "%.1f", app_state.ds_temp[0]);
-    //else
-    //    lv_label_set_text(ui_LabelTempVun, "--");
+    if (app_state.ds_valid[0])
+        lv_label_set_text_fmt(ui_TempCurrent, "%.1f", app_state.ds_temp[0]);
+    else
+        lv_label_set_text(ui_TempCurrent, "--");
 	//
     //// Frizer
-    //if (app_state.ds_valid[1])
-    //    lv_label_set_text_fmt(ui_TempFrige, "%.0f", app_state.ds_temp[1]);
+    //if (app_state.ds_valid[2])
+    //    lv_label_set_text_fmt(ui_TempFrige, "%.0f", app_state.ds_temp[2]);
     //else
     //    lv_label_set_text(ui_TempFrige, "--");
 	//
@@ -25,13 +25,13 @@ void ui_update_ds18b20(void)
 
     if (app_state.ds_valid[2])
     {
-        float temp = app_state.ds_temp[2];
+        float temp = app_state.ds_temp[1];
     
         lv_label_set_text_fmt(ui_TempFrige, "%.0f", temp);
 
         // ===================== AUDIO EVENT: FRIDGE2 HIGH TEMP =====================
 		if (app_state.ds_valid[2]) {
-			float t = app_state.ds_temp[2];
+			float t = app_state.ds_temp[1];
 		
 			if (t > 4.0f) {
 				if (!app_state.fridge2_temp_alerted) {
