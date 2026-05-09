@@ -118,7 +118,7 @@ void power_manager_task(void *arg)
                 stable_level = level;
                 counter = 0;
 
-                if (stable_level == 0)
+                if (stable_level == 1)
                     enter_sleep_mode();
                 else
                     exit_sleep_mode();

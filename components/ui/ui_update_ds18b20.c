@@ -23,14 +23,14 @@ void ui_update_ds18b20(void)
     // Test
     // Frizer
 
-    if (app_state.ds_valid[2])
+    if (app_state.ds_valid[1])
     {
         float temp = app_state.ds_temp[1];
     
         lv_label_set_text_fmt(ui_TempFrige, "%.0f", temp);
 
         // ===================== AUDIO EVENT: FRIDGE2 HIGH TEMP =====================
-		if (app_state.ds_valid[2]) {
+		if (app_state.ds_valid[1]) {
 			float t = app_state.ds_temp[1];
 		
 			if (t > 4.0f) {
