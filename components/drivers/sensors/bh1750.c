@@ -4,7 +4,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define BH1750_ADDR 0x5C
+#define BH1750_ADDR 0x23  
+//0x5C
 
 static const char *TAG = "BH1750";
 

@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define UART_PORT UART_NUM_2
-#define UART_RX   45
+#define UART_RX   27
 #define BUF_SIZE 256
 
 static const char *TAG = "VICTRON";

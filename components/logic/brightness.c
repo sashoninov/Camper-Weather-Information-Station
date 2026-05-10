@@ -4,22 +4,18 @@
 #include <time.h>
 #include <math.h>
 #include "app_state.h"
+#include "power_manager.h"   // ⭐ важно
 
 static bool wake_override = false;
 static int64_t last_touch = 0;
 
 #define WAKE_TIMEOUT_MS 30000
-#define MIN_BRIGHTNESS  10
-
-// ====================== FILTER STATE ======================
+#define MIN_BRIGHTNESS  5
 
 static float lux_filtered = -1.0f;
 static uint8_t last_brightness = 0;
 
-// Хистерезис: промяна само ако разликата е >= 3%
 #define BRIGHTNESS_HYSTERESIS 3
-
-// ====================== TIME CHECK ======================
 
 static bool is_dim_time()
 {
@@ -38,8 +34,6 @@ static bool is_dim_time()
     else
         return (now_m >= start || now_m < end);
 }
-
-// ====================== TOUCH WAKE ======================
 
 void brightness_touch_event()
 {
@@ -60,11 +54,9 @@ static bool is_wake_active()
     return false;
 }
 
-// ====================== LUX FILTER (EMA) ======================
-
 static float filter_lux(float lux)
 {
-    const float alpha = 0.15f;  // плавно, но бързо реагира
+    const float alpha = 0.15f;
 
     if (lux_filtered < 0.0f) {
         lux_filtered = lux;
@@ -75,49 +67,44 @@ static float filter_lux(float lux)
     return lux_filtered;
 }
 
-// ====================== AUTO CURVE ======================
-
 static uint8_t calc_auto(float lux)
 {
     if (lux < 0.1f) lux = 0.1f;
     if (lux > 1000.0f) lux = 1000.0f;
 
     float log_lux = log10f(lux);
-
     float norm = (log_lux + 1.0f) / 3.0f;
 
     if (norm < 0) norm = 0;
     if (norm > 1) norm = 1;
 
-    // 20–100%
     return 20 + norm * 80;
 }
 
-// ====================== MAIN ======================
-
 uint8_t brightness_calculate(float lux)
 {
-    // 1) Филтрираме входа
+    // ⭐ КРИТИЧНО: ако сме в sleep → яркост = 0
+    if (power_sleep_active) {
+        last_brightness = 0;
+        return 0;
+    }
+
     lux = filter_lux(lux);
 
     uint8_t auto_brightness = calc_auto(lux);
 
-    // 2) USER LIMIT (MAX)
     uint8_t scaled =
         (auto_brightness * g_settings.manual_brightness) / 100;
 
     if (scaled < MIN_BRIGHTNESS)
         scaled = MIN_BRIGHTNESS;
 
-    // 3) AUTODIM OFF
     if (!g_settings.autodim)
     {
-        // Обновяваме флага → НЕ димираме
         app_state_lock();
         app_state.dimming_active = false;
         app_state_unlock();
 
-        // Хистерезис
         if (abs((int)scaled - (int)last_brightness) < BRIGHTNESS_HYSTERESIS)
             return last_brightness;
 
@@ -125,7 +112,6 @@ uint8_t brightness_calculate(float lux)
         return scaled;
     }
 
-    // 4) AUTODIM ON
     bool dim_active = is_dim_time();
     bool wake = is_wake_active();
 
@@ -133,12 +119,10 @@ uint8_t brightness_calculate(float lux)
     {
         if (wake)
         {
-            // НЕ димираме → wake override
             app_state_lock();
             app_state.dimming_active = false;
             app_state_unlock();
 
-            // Хистерезис
             if (abs((int)scaled - (int)last_brightness) < BRIGHTNESS_HYSTERESIS)
                 return last_brightness;
 
@@ -147,7 +131,6 @@ uint8_t brightness_calculate(float lux)
         }
         else
         {
-            // ДИМИРАНЕ АКТИВНО
             app_state_lock();
             app_state.dimming_active = true;
             app_state_unlock();
@@ -157,12 +140,10 @@ uint8_t brightness_calculate(float lux)
         }
     }
 
-    // 5) Нормален режим → НЕ димираме
     app_state_lock();
     app_state.dimming_active = false;
     app_state_unlock();
 
-    // Хистерезис
     if (abs((int)scaled - (int)last_brightness) < BRIGHTNESS_HYSTERESIS)
         return last_brightness;
 

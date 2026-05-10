@@ -6,9 +6,12 @@
 extern "C" {
 #endif
 
+extern bool power_sleep_active;
+
 void power_manager_init(void);
 void power_manager_task(void *arg);
-bool power_manager_is_sleeping(void);
+void power_manager_force_sleep(void);
+void power_manager_force_wake(void);
 
 #ifdef __cplusplus
 }
