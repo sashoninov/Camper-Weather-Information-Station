@@ -74,3 +74,153 @@ Features include:
 - Fast sensor updates
 - Continuous visual feedback
 - Integrated directly into the main dashboard
+
+
+# Hardware Overview
+
+The Camper Information & Monitoring System is built around the ESP32-P4 platform and combines multiple sensors and communication interfaces to provide monitoring and control of the camper's essential systems.
+
+## Main Controller
+
+The project supports both Waveshare ESP32-P4 development boards:
+
+- ESP32-P4-Module High-performance Development Board
+- ESP32-P4-WIFI6-DEV-KIT
+
+Both boards are based on the **ESP32-P4** application processor and an **ESP32-C6** wireless coprocessor, providing:
+
+- Wi-Fi 6
+- Bluetooth 5 / BLE
+- High-performance graphics support
+- Multiple UART, I²C and SPI interfaces
+- MIPI-DSI display interface
+- Capacitive touch support
+
+Hardware information:
+
+- :contentReference[oaicite:0]{index=0}
+- :contentReference[oaicite:1]{index=1}
+
+---
+
+## Display
+
+The graphical interface was originally designed for:
+
+**Waveshare 10.1-inch DSI Capacitive Touch Display**
+
+Resolution:
+
+- 1280 × 800
+- IPS panel
+- Capacitive multi-touch
+
+Product page:
+
+- :contentReference[oaicite:2]{index=2}
+
+During development, the project is primarily tested on:
+
+**Waveshare 5-inch DSI Capacitive Touch Display**
+
+Resolution:
+
+- 1280 × 720
+- Capacitive multi-touch
+
+Product page:
+
+- :contentReference[oaicite:3]{index=3}
+
+---
+
+## Sensors
+
+### DS3231 Real-Time Clock
+
+Provides an accurate real-time clock and maintains date and time while the system is powered off.
+
+### BME680
+
+Monitors the environmental conditions inside the camper:
+
+- Temperature
+- Humidity
+- Atmospheric pressure
+- Indoor Air Quality (IAQ)
+
+### BH1750
+
+Ambient light sensor used for automatic display brightness adjustment.
+
+### DS18B20
+
+Two waterproof digital temperature sensors are used:
+
+- Outside ambient temperature
+- Refrigerator compartment temperature
+
+### INA3221
+
+Three-channel voltage monitor used for:
+
+- Starter battery voltage
+- Fresh water tank level
+- Grey water tank level
+
+### MPU6050
+
+Six-axis IMU used by the Camper Leveling Assistant to measure vehicle pitch and roll for precise leveling.
+
+---
+
+## Communication Modules
+
+### Victron SmartSolar MPPT
+
+Connected via UART (VE.Direct).
+
+Provides real-time monitoring of:
+
+- House battery status
+- Solar charging information
+- Battery voltage
+- Battery current
+- Solar panel voltage
+- Power generation
+- System load
+
+### SIMCom A7670E LTE Modem
+
+Connected through dedicated UART interfaces.
+
+Provides:
+
+- 4G LTE Internet connectivity
+- HTTP requests for weather services
+- GPS receiver
+- Location information
+
+Product page:
+
+- :contentReference[oaicite:4]{index=4}
+
+- ### Alpicool Portable Refrigerator
+
+The system integrates directly with compatible **Alpicool portable refrigerators** over **Bluetooth Low Energy (BLE)**.
+
+The built-in BLE client provides both real-time monitoring and remote control of the refrigerator.
+
+Available features include:
+
+- Refrigerator connection status
+- Current internal temperature
+- Target temperature
+- Cooling mode
+- Battery protection level
+- Compressor status
+- Power on/off control
+- Temperature adjustment
+- Operating mode selection
+
+The refrigerator is fully integrated into the Main Dashboard, allowing monitoring and control without using the manufacturer's mobile application.
