@@ -1,7 +1,7 @@
 # Camper Information & Monitoring System
 
 <p align="center">
-  <img src="assets/Image 27.07.2026 г., 00_19_06.png" width="700">
+  <img src="assets/Image .png" width="700">
 </p>
 
 ## User Interface
