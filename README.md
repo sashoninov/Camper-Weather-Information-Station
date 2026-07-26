@@ -84,7 +84,7 @@ The Camper Information & Monitoring System is built around the ESP32-P4 platform
 
 The project supports both Waveshare ESP32-P4 development boards:
 
-- ESP32-P4-Module High-performance Development Board
+- ESP32-P4-Module High-performance Development Board  https://www.waveshare.com/esp32-p4-module-dev-kit.htm?srsltid=AfmBOooXO1gcZ95H76G10vcrTli3m9XoD4qQeatHZypbfZcwjPw9f9YV
 - ESP32-P4-WIFI6-DEV-KIT
 
 Both boards are based on the **ESP32-P4** application processor and an **ESP32-C6** wireless coprocessor, providing:
@@ -96,10 +96,7 @@ Both boards are based on the **ESP32-P4** application processor and an **ESP32-C
 - MIPI-DSI display interface
 - Capacitive touch support
 
-Hardware information:
 
-- :contentReference[oaicite:0]{index=0}
-- :contentReference[oaicite:1]{index=1}
 
 ---
 
@@ -115,9 +112,7 @@ Resolution:
 - IPS panel
 - Capacitive multi-touch
 
-Product page:
 
-- :contentReference[oaicite:2]{index=2}
 
 During development, the project is primarily tested on:
 
@@ -128,9 +123,7 @@ Resolution:
 - 1280 × 720
 - Capacitive multi-touch
 
-Product page:
 
-- :contentReference[oaicite:3]{index=3}
 
 ---
 
@@ -190,22 +183,7 @@ Provides real-time monitoring of:
 - Power generation
 - System load
 
-### SIMCom A7670E LTE Modem
-
-Connected through dedicated UART interfaces.
-
-Provides:
-
-- 4G LTE Internet connectivity
-- HTTP requests for weather services
-- GPS receiver
-- Location information
-
-Product page:
-
-- :contentReference[oaicite:4]{index=4}
-
-- ### Alpicool Portable Refrigerator
+### Alpicool Portable Refrigerator
 
 The system integrates directly with compatible **Alpicool portable refrigerators** over **Bluetooth Low Energy (BLE)**.
 
@@ -224,3 +202,20 @@ Available features include:
 - Operating mode selection
 
 The refrigerator is fully integrated into the Main Dashboard, allowing monitoring and control without using the manufacturer's mobile application.
+
+### SIMCom A7670E LTE Modem
+
+Connected through dedicated UART interfaces.
+
+Provides:
+
+- 4G LTE Internet connectivity
+- HTTP requests for weather services
+- GPS receiver
+- Location information
+
+Product page:
+
+https://www.and-global.com/list_23/568.html
+
+
