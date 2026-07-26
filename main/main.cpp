@@ -9,22 +9,30 @@ extern "C" {
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "sdcard.h"
-
-    
+#include "esp_hosted.h"
 }
 
 #include "power_manager.h"
 #include "esp_wifi.h"
 
+#include "nimble/nimble_port.h"
+#include "nimble/nimble_port_freertos.h"
+#include "host/ble_hs.h"
+#include "alpicool.h"
+#include "alpicool_ble.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "gps_raw_logger.h"
+
 
 #include "esp_lvgl_port.h"
 #include "wifi.h"
 #include "time_sync.h"
 
+// ⭐ Добавено
+#include "sim_a7670.h"
 
+#include "http_gateway.h"   // ⭐ НОВО
 
 
 // TASKS
@@ -32,7 +40,7 @@ extern "C" {
 #include "weather_task.h"
 #include "location_task.h"
 #include "sensor_task.h"
-#include "scd41_task.h"
+
 #include "brightness_task.h"
 #include "ds18b20_task.h"
 #include "victron_task.h"
@@ -53,13 +61,14 @@ extern "C" {
 // UI
 #include "ui.h"
 #include "settings_ui.h"
+#include "alpicool_ui.h"
 #include "global_touch.h"
 
 // Logic
 #include "settings.h"
 
 // Sensors
-#include "scd41.h"
+
 #include "bh1750.h"
 #include "ina3221.h"
 #include "mpu6050.h"
@@ -80,6 +89,11 @@ extern "C" {
 
 static const char *TAG = "MAIN";
 
+extern "C" void host_task(void *param)
+{
+    nimble_port_run();
+    nimble_port_freertos_deinit();
+}
 
 // =========================
 // TOUCH -> WAKE
@@ -108,29 +122,6 @@ static void ui_nivel_task(void *arg)
 }
 
 // =========================
-// GPS DEBUG TASK
-// =========================
-static void gps_debug_task(void *arg)
-{
-    gps_data_t gps;
-
-    while (1) {
-        if (gps_read(&gps)) {
-            ESP_LOGI("GPS", "Lat: %.6f Lon: %.6f", gps.lat, gps.lon);
-
-            app_state_lock();
-            app_state.gps.lat   = gps.lat;
-            app_state.gps.lon   = gps.lon;
-            app_state.gps.valid = gps.valid;
-            app_state_unlock();
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(2000));
-    }
-}
-
-
-// =========================
 // MAIN
 // =========================
 extern "C" void app_main(void)
@@ -138,12 +129,10 @@ extern "C" void app_main(void)
     ESP_LOGI("MAIN", "System boot");
 
     ////////////////////////////////
-     /// SD CARD ///
-
+    /// SD CARD ///
     if (sdcard_init() == ESP_OK) {
         sdcard_list_files("/sdcard/audio/system");
     }
-
 
     ESP_LOGI(TAG, "System boot");
 
@@ -164,9 +153,33 @@ extern "C" void app_main(void)
         ESP_LOGW(TAG, "Using default settings");
     }
 
+    // ⭐ Инициализация на HTTP gateway (mutex за всички заявки)
+    http_gateway_init();
+
+    // ⭐ Зареждаме /GSM 
+    ESP_LOGI(TAG, "Starting GSM modem...");
+
+    sim_a7670_init();
+    sim_a7670_start();
+    sim_a7670_monitor_start();
+
+	ESP_LOGI(TAG, "Starting GPS...");
+	
+	if (!gps_init())
+	{
+		ESP_LOGE(TAG, "gps_init() failed");
+	}
+	
+	if (!gps_start())
+	{
+		ESP_LOGE(TAG, "gps_start() failed");
+	}
+
     // I2C
     ESP_ERROR_CHECK(i2c_bus_init());
     ESP_ERROR_CHECK(i2c1_bus_init());
+
+    i2c1_scan();
 
     // RTC
     ds3231_init();
@@ -181,15 +194,19 @@ extern "C" void app_main(void)
         ESP_LOGI("RTC", "Loaded time from DS3231");
     }
 
-    // WIFI
-    ESP_ERROR_CHECK(wifi_init_sta());
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    // WIFI SoftAP
+    ESP_ERROR_CHECK(wifi_init());
+    ESP_ERROR_CHECK(wifi_start());
 
-    if (!wifi_is_connected()) {
-        ESP_LOGI("WIFI", "Retry connect...");
-        esp_wifi_connect();
-    }
 
+    // BLE 
+    esp_hosted_connect_to_slave();
+    esp_hosted_bt_controller_init();
+    esp_hosted_bt_controller_enable();
+
+    nimble_port_init();
+    ble_hs_cfg.sync_cb = ble_on_sync;
+    nimble_port_freertos_init(host_task);    
 
     time_sync_init();
 
@@ -206,6 +223,11 @@ extern "C" void app_main(void)
 
     lv_obj_add_event_cb(lv_scr_act(), global_touch_handler, LV_EVENT_ALL, NULL);
 
+    // 🔹 Alpicool UI events
+    lv_obj_add_event_cb(ui_ImgButton3, ui_event_power, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(ui_ImgButton4, ui_event_mode,  LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(ui_SliderTemp, ui_event_temp,  LV_EVENT_VALUE_CHANGED, NULL);
+
     // AUDIO
     audio_manager_init();
     audio_play_event(AUDIO_EVENT_BOOT);
@@ -214,7 +236,7 @@ extern "C" void app_main(void)
     xTaskCreate(ui_nivel_task, "ui_nivel", 4096, NULL, 5, NULL);
 
     // SENSORS
-    scd41_init();
+
     bh1750_init();
     ina3221_init();
     mpu6050_init();
@@ -225,8 +247,13 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "Calibrating MPU6050...");
     mpu6050_calibrate();
 
-    // GPS
-    gps_init();
+
+    // Alpicool
+    alpicool_init();
+ 
+    alpicool_status_t st = {0};
+    alpicool_get_status(&st);
+    alpicool_ui_update(&st);   
 
     // POWER MANAGER
     power_manager_init();
@@ -235,22 +262,22 @@ extern "C" void app_main(void)
     // TASKS
     xTaskCreate(time_task,         "time",         4096, NULL, 5, NULL);
     xTaskCreate(time_sync_task,    "time_sync",    4096, NULL, 5, NULL);
-    xTaskCreate(location_task,     "location",     4096, NULL, 5, NULL);
+    xTaskCreate(location_task,     "location",     16384, NULL, 5, NULL);
 
     while (!time_sync_is_valid()) {
         ESP_LOGI("MAIN", "Waiting for valid time...");
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    xTaskCreate(weather_task,      "weather",      8192, NULL, 5, NULL);
+    xTaskCreate(weather_task,      "weather",      16384, NULL, 5, NULL);
     xTaskCreate(sensor_task,       "sensor_task",  4096, NULL, 5, NULL);
-    xTaskCreate(scd41_task,        "scd41",        4096, NULL, 5, NULL);
+
     xTaskCreate(ds18b20_task,      "ds18b20",      4096, NULL, 5, NULL);
     xTaskCreate(victron_task,      "victron",      4096, NULL, 5, NULL);
     xTaskCreate(brightness_task,   "brightness",   4096, NULL, 5, NULL);
     xTaskCreate(gpio_monitor_task, "gpio_monitor", 4096, NULL, 5, NULL);
 
-    xTaskCreate(gps_debug_task, "gps_debug", 4096, NULL, 4, NULL);
+    
 
     ESP_LOGI(TAG, "System ready");
 

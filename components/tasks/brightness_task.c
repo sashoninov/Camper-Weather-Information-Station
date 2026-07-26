@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "power_manager.h"
 //#include "drivers/bh1750.h"
 #include "lvgl.h"
 
@@ -39,7 +40,10 @@ void brightness_task(void *pv)
             current_brightness -= (diff < -3) ? 3 : 1;
         }
 
-        display_set_brightness(current_brightness);
+        if (!power_sleep_active)
+		{
+			display_set_brightness(current_brightness);
+		}
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }

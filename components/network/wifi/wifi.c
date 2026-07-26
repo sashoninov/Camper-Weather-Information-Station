@@ -1,256 +1,424 @@
-#include "wifi.h"
-#include "wifi_storage.h"
-#include "app_state.h"
-#include "ui_location.h"
-#include "wifi_roaming.h"
+/******************************************************************************
+ *
+ * wifi.c
+ *
+ * Camper Weather Station
+ * ESP32-P4
+ *
+ * SoftAP ONLY
+ *
+ ******************************************************************************/
 
-#include "esp_wifi.h"
+#include "wifi.h"
+
+#include "app_state.h"
+#include "ota_update.h"
+
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
-#include "ota_update.h"
+#include "esp_netif_ip_addr.h"
+#include "esp_wifi.h"
+#include "lwip/ip4_addr.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #include <string.h>
 
-static const char *TAG = "WIFI";
+static const char *TAG = "SOFTAP";
 
-static void wifi_watchdog_task(void *arg);
+/******************************************************************************
+ * Globals
+ ******************************************************************************/
 
-static bool s_connected = false;
-static bool s_waiting_for_test = false;
-static bool s_test_result = false;
+static esp_netif_t *s_ap_netif = NULL;
 
-extern volatile bool roaming_enabled;
+static softap_config_t s_cfg;
 
-// ⭐ Глобални за UI
-char wifi_ssid[33] = {0};
-char wifi_ip[16]   = {0};
+static bool s_running = false;
 
-// ===================== EVENT HANDLER =====================
+static uint8_t s_clients = 0;
 
-static void wifi_event_handler(void *arg,
-                               esp_event_base_t event_base,
-                               int32_t event_id,
-                               void *event_data)
+/******************************************************************************
+ * Forward declarations
+ ******************************************************************************/
+
+static void wifi_event_handler(
+        void *arg,
+        esp_event_base_t event_base,
+        int32_t event_id,
+        void *event_data);
+
+static esp_err_t wifi_configure_network(void);
+
+static esp_err_t wifi_configure_ap(void);
+
+/******************************************************************************
+ * WiFi Event Handler
+ ******************************************************************************/
+
+static void wifi_event_handler(
+        void *arg,
+        esp_event_base_t event_base,
+        int32_t event_id,
+        void *event_data)
 {
-    if (event_base == WIFI_EVENT) {
+    (void)arg;
 
-        if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    if (event_base != WIFI_EVENT)
+        return;
 
-            s_connected = false;
+    switch (event_id)
+    {
+        case WIFI_EVENT_AP_START:
 
-            if (s_waiting_for_test)
-                s_test_result = false;
+            ESP_LOGI(TAG, "SoftAP started");
+
+            s_running = true;
 
             app_state_lock();
             app_state.wifi_connected = false;
             app_state_unlock();
 
-            wifi_ssid[0] = 0;
-            wifi_ip[0] = 0;
+            ota_start_server();
 
-            ui_update_wifi_icon();
-        }
+            break;
 
-    } else if (event_base == IP_EVENT) {
+        case WIFI_EVENT_AP_STOP:
 
-        if (event_id == IP_EVENT_STA_GOT_IP) {
+            ESP_LOGI(TAG, "SoftAP stopped");
 
-            s_connected = true;
+            s_running = false;
+            s_clients = 0;
 
-            if (s_waiting_for_test)
-                s_test_result = true;
+            app_state_lock();
+            app_state.wifi_connected = false;
+            app_state_unlock();
+
+            break;
+
+        case WIFI_EVENT_AP_STACONNECTED:
+        {
+            wifi_event_ap_staconnected_t *ev =
+                (wifi_event_ap_staconnected_t *)event_data;
+
+            s_clients++;
+
+            ESP_LOGI(TAG,
+                     "Client connected "
+                     MACSTR
+                     " AID=%d (%u clients)",
+                     MAC2STR(ev->mac),
+                     ev->aid,
+                     s_clients);
 
             app_state_lock();
             app_state.wifi_connected = true;
             app_state_unlock();
 
-            // ⭐ SSID (ESP-IDF 5.x няма ssid_len)
-            wifi_ap_record_t info;
-            if (esp_wifi_sta_get_ap_info(&info) == ESP_OK) {
-                memcpy(wifi_ssid, info.ssid, sizeof(info.ssid));
-                wifi_ssid[32] = 0;   // гарантираме нула
-            }
-
-            // ⭐ IP
-            esp_netif_ip_info_t ip;
-            esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip);
-            sprintf(wifi_ip, IPSTR, IP2STR(&ip.ip));
-
-            ui_update_wifi_icon();
-            wifi_roaming_resume();
-
-             // ⭐⭐ ТУК ДОБАВЯШ OTA ⭐⭐
-             ESP_LOGI(TAG, "WiFi connected, starting OTA server...");
-             ota_start_server();
-
-
+            break;
         }
+
+        case WIFI_EVENT_AP_STADISCONNECTED:
+        {
+            wifi_event_ap_stadisconnected_t *ev =
+                (wifi_event_ap_stadisconnected_t *)event_data;
+
+            if (s_clients)
+                s_clients--;
+
+            ESP_LOGI(TAG,
+                     "Client disconnected "
+                     MACSTR
+                     " AID=%d (%u clients)",
+                     MAC2STR(ev->mac),
+                     ev->aid,
+                     s_clients);
+
+            app_state_lock();
+            app_state.wifi_connected = (s_clients != 0);
+            app_state_unlock();
+
+            break;
+        }
+
+        default:
+            break;
     }
 }
 
-// ===================== APPLY CREDENTIALS =====================
+/******************************************************************************
+ * Configure SoftAP network
+ ******************************************************************************/
 
-static esp_err_t wifi_apply_credentials(const char *ssid, const char *pass)
+static esp_err_t wifi_configure_network(void)
 {
-    wifi_config_t wifi_config = (wifi_config_t){ 0 };
+    esp_netif_ip_info_t ip;
 
-    strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+    IP4_ADDR(&ip.ip,      192,168,4,1);
+    IP4_ADDR(&ip.gw,      192,168,4,1);
+    IP4_ADDR(&ip.netmask, 255,255,255,0);
 
-    if (pass && pass[0] != '\0') {
-        strlcpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password));
-        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    } else {
-        wifi_config.sta.password[0] = '\0';
-        wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
-    }
+    ESP_ERROR_CHECK(esp_netif_dhcps_stop(s_ap_netif));
 
-    wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    ESP_ERROR_CHECK(
+        esp_netif_set_ip_info(
+            s_ap_netif,
+            &ip));
 
-    esp_wifi_disconnect();
-    esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-    esp_wifi_connect();
+    ESP_ERROR_CHECK(
+        esp_netif_dhcps_start(
+            s_ap_netif));
+
+    ESP_LOGI(TAG,
+             "SoftAP IP: %s",
+             WIFI_AP_IP);
 
     return ESP_OK;
 }
 
-// ===================== INIT =====================
+/******************************************************************************
+ * Configure SoftAP
+ ******************************************************************************/
 
-esp_err_t wifi_init_sta(void)
+static esp_err_t wifi_configure_ap(void)
 {
-    esp_netif_create_default_wifi_sta();
+    wifi_load_ap_config(&s_cfg);
+	ESP_LOGI(TAG, "Loaded password: '%s' len=%u",
+         s_cfg.password,
+         strlen(s_cfg.password));
+
+    wifi_config_t cfg = {0};
+
+    strlcpy((char *)cfg.ap.ssid,
+            WIFI_AP_SSID,
+            sizeof(cfg.ap.ssid));
+
+    strlcpy((char *)cfg.ap.password,
+            s_cfg.password,
+            sizeof(cfg.ap.password));
+
+    cfg.ap.ssid_len = strlen(WIFI_AP_SSID);
+
+    cfg.ap.channel = WIFI_AP_CHANNEL;
+
+    cfg.ap.max_connection = WIFI_AP_MAX_CLIENTS;
+
+    cfg.ap.pmf_cfg.required = false;
+
+    if (strlen(s_cfg.password) >= 8)
+    {
+        cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
+    }
+    else
+    {
+        cfg.ap.authmode = WIFI_AUTH_OPEN;
+        cfg.ap.password[0] = 0;
+    }
+
+    ESP_ERROR_CHECK(
+        esp_wifi_set_mode(WIFI_MODE_AP));
+
+    ESP_ERROR_CHECK(
+        esp_wifi_set_config(
+            WIFI_IF_AP,
+            &cfg));
+			
+	ESP_LOGI(TAG, "WiFi password: '%s' len=%u",
+         cfg.ap.password,
+         strlen((char *)cfg.ap.password));		
+
+    ESP_LOGI(TAG,
+             "SSID      : %s",
+             WIFI_AP_SSID);
+
+
+    return ESP_OK;
+}
+
+/******************************************************************************
+ * Initialize
+ ******************************************************************************/
+
+esp_err_t wifi_init(void)
+{
+    ESP_LOGI(TAG, "Initializing SoftAP...");
+
+    s_ap_netif = esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&cfg);
 
-    esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL);
-    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL);
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    char ssid[32] = {0};
-    char pass[64] = {0};
+    ESP_ERROR_CHECK(
+        esp_event_handler_register(
+            WIFI_EVENT,
+            ESP_EVENT_ANY_ID,
+            &wifi_event_handler,
+            NULL));
 
-    wifi_config_t wifi_config = (wifi_config_t){ 0 };
+    ESP_ERROR_CHECK(wifi_configure_ap());
 
-    if (wifi_load_credentials(ssid, pass) == ESP_OK) {
-
-        strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
-        strlcpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password));
-
-        wifi_config.sta.threshold.authmode =
-            (pass[0] != '\0') ? WIFI_AUTH_WPA2_PSK : WIFI_AUTH_OPEN;
-
-        wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
-
-        esp_wifi_set_mode(WIFI_MODE_STA);
-        esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-        esp_wifi_start();
-        esp_wifi_connect();
-
-    } else {
-
-        esp_wifi_set_mode(WIFI_MODE_STA);
-        esp_wifi_start();
-    }
-
-    xTaskCreate(wifi_watchdog_task, "wifi_watchdog", 4096, NULL, 5, NULL);
-
-    wifi_roaming_start();
+    ESP_ERROR_CHECK(wifi_configure_network());
 
     return ESP_OK;
 }
 
-// ===================== BASIC =====================
+/******************************************************************************
+ * Start
+ ******************************************************************************/
+
+esp_err_t wifi_start(void)
+{
+    if (s_running)
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Starting SoftAP");
+
+    return esp_wifi_start();
+}
+
+/******************************************************************************
+ * Stop
+ ******************************************************************************/
+
+esp_err_t wifi_stop(void)
+{
+    if (!s_running)
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping SoftAP");
+
+    return esp_wifi_stop();
+}
+
+/******************************************************************************
+ * Restart
+ ******************************************************************************/
+
+esp_err_t wifi_restart(void)
+{
+    ESP_ERROR_CHECK(wifi_stop());
+
+    vTaskDelay(pdMS_TO_TICKS(300));
+
+    ESP_ERROR_CHECK(wifi_configure_ap());
+
+    return wifi_start();
+}
+
+/******************************************************************************
+ * Status
+ ******************************************************************************/
+
+bool wifi_is_running(void)
+{
+    return s_running;
+}
 
 bool wifi_is_connected(void)
 {
-    return s_connected;
+    return (s_clients > 0);
 }
 
-esp_err_t wifi_set_credentials(const char *ssid, const char *pass)
+uint8_t wifi_get_connected_clients(void)
 {
-    wifi_roaming_pause();
-
-    wifi_save_credentials(ssid, pass);
-
-    return wifi_apply_credentials(ssid, pass);
+    return s_clients;
 }
 
-// ===================== SCAN =====================
+/******************************************************************************
+ * Information
+ ******************************************************************************/
 
-int wifi_scan(char ssids[][33], int max)
+const char *wifi_get_ssid(void)
 {
-    wifi_scan_config_t scan_cfg = {0};
-    esp_wifi_scan_start(&scan_cfg, true);
-
-    uint16_t n = max;
-    wifi_ap_record_t rec[20];
-    esp_wifi_scan_get_ap_records(&n, rec);
-
-    if (n > max) n = max;
-
-    for (int i = 0; i < n; i++) {
-        strncpy(ssids[i], (char *)rec[i].ssid, 32);
-        ssids[i][32] = 0;
-    }
-
-    return n;
+    return WIFI_AP_SSID;
 }
 
-// ===================== TEST CONNECTION =====================
-
-bool wifi_test_connection(const char *ssid, const char *pass)
+const char *wifi_get_ip(void)
 {
-    const int total_wait_ms = 9000;
-    const int step_ms       = 300;
-
-    wifi_roaming_pause();
-
-    s_waiting_for_test = true;
-    s_test_result = false;
-
-    wifi_apply_credentials(ssid, pass);
-
-    int steps = total_wait_ms / step_ms;
-    for (int i = 0; i < steps; i++) {
-        vTaskDelay(pdMS_TO_TICKS(step_ms));
-        if (s_test_result) {
-            s_waiting_for_test = false;
-            wifi_roaming_resume();
-            return true;
-        }
-    }
-
-    s_waiting_for_test = false;
-    wifi_roaming_resume();
-    return false;
+    return WIFI_AP_IP;
 }
 
-// ===================== WATCHDOG =====================
-
-static void wifi_watchdog_task(void *arg)
+uint8_t wifi_get_channel(void)
 {
-    int counter = 0;
+    return WIFI_AP_CHANNEL;
+}
 
-    while (1)
+const char *wifi_get_hostname(void)
+{
+    return WIFI_AP_HOSTNAME;
+}
+
+/******************************************************************************
+ * MAC address
+ ******************************************************************************/
+
+void wifi_get_mac(char *buffer, size_t len)
+{
+    if (buffer == NULL || len == 0)
     {
-        if (!roaming_enabled) {
-            vTaskDelay(pdMS_TO_TICKS(500));
-            continue;
-        }
-
-        if (wifi_is_connected()) {
-            counter = 0;
-        } else {
-            counter++;
-            if (counter >= 30) {
-                esp_wifi_connect();
-                counter = 0;
-            }
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        return;
     }
+
+    uint8_t mac[6];
+
+    if (esp_wifi_get_mac(WIFI_IF_AP, mac) != ESP_OK)
+    {
+        buffer[0] = '\0';
+        return;
+    }
+
+    snprintf(buffer,
+             len,
+             "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0],
+             mac[1],
+             mac[2],
+             mac[3],
+             mac[4],
+             mac[5]);
 }
+
+/******************************************************************************
+ * Configuration
+ ******************************************************************************/
+
+void wifi_get_config(softap_config_t *cfg)
+{
+    if (cfg == NULL)
+    {
+        return;
+    }
+
+    memcpy(cfg,
+           &s_cfg,
+           sizeof(softap_config_t));
+}
+
+esp_err_t wifi_set_config(const softap_config_t *cfg)
+{
+    if (cfg == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    memcpy(&s_cfg,
+           cfg,
+           sizeof(softap_config_t));
+
+    ESP_ERROR_CHECK(
+        wifi_save_ap_config(&s_cfg));
+
+    return wifi_restart();
+}
+
+/******************************************************************************
+ * End of file
+ ******************************************************************************/

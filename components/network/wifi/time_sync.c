@@ -1,9 +1,10 @@
 #include "time_sync.h"
 #include "esp_log.h"
-#include "gps.h"
 #include "ds3231.h"
 #include "time_format.h"
 #include "app_state.h"
+#include "sim_a7670.h"
+#include "gps.h"
 
 #include <string.h>
 #include <sys/time.h>
@@ -13,7 +14,6 @@
 #include "storage_coords.h"
 #include "audio_manager.h"
 #include "audio_events.h"
-
 
 static const char *TAG = "TIME_SYNC";
 
@@ -34,17 +34,9 @@ typedef struct {
 
 // Балкани: 3 часови зони
 static const tz_zone_t tz_zones[] = {
-    // EET/EEST → Bulgaria, Greece, Romania
-    { "EET-2EEST,M3.5.0/3,M10.5.0/4",
-      34.0, 48.5, 19.0, 29.7 },
-
-    // CET/CEST → Central & Western Europe
-    { "CET-1CEST,M3.5.0/2,M10.5.0/3",
-      35.0, 70.0, -10.0, 30.0 },
-
-    // TRT → Turkey
-    { "TRT-3",
-      35.8, 42.1, 25.6, 44.8 },
+    { "EET-2EEST,M3.5.0/3,M10.5.0/4", 34.0, 48.5, 19.0, 29.7 },   // BG/GR/RO
+    { "CET-1CEST,M3.5.0/2,M10.5.0/3", 35.0, 70.0, -10.0, 30.0 }, // Central EU
+    { "TRT-3",                      35.8, 42.1, 25.6, 44.8 },    // Turkey
 };
 
 // ===============================
@@ -130,82 +122,60 @@ static bool load_time_from_rtc(void)
 }
 
 // ===============================
-// GPS SYNC (GPS = UTC)
+// GNSS SYNC (GNSS = UTC)
 // ===============================
 static bool sync_rtc_from_gps(void)
 {
-    gps_data_t gps;
+    double lat = 0.0, lon = 0.0;
+    struct tm utc = {};
 
-    if (!gps_read(&gps))
-        return false;
-
-    if (!gps.valid_time) {
-        ESP_LOGW(TAG, "GPS has NO VALID TIME → skip GPS sync");
+    // 1) GNSS координати
+    if (!gps_get_location(&lat, &lon)
+) {
+        ESP_LOGW(TAG, "GNSS: no coordinates → skip sync");
         return false;
     }
 
-    // Ако GPS няма дата → ползваме датата от DS3231
-    if (gps.year == 0 || gps.month == 0 || gps.day == 0) {
-        struct tm rtc_tm = {};
-        if (ds3231_get_time(&rtc_tm)) {
-            gps.year  = rtc_tm.tm_year + 1900;
-            gps.month = rtc_tm.tm_mon + 1;
-            gps.day   = rtc_tm.tm_mday;
+    // 🔥 ЗАПИСВАМЕ КООРДИНАТИТЕ В app_state
+    app_state_lock();
+    app_state.location.lat = lat;
+    app_state.location.lon = lon;
+    app_state_unlock();
 
-            ESP_LOGW(TAG,
-                     "GPS has NO DATE → using RTC date %04d-%02d-%02d",
-                     gps.year, gps.month, gps.day);
-        } else {
-            ESP_LOGW(TAG, "GPS has NO DATE and RTC invalid → skipping GPS sync");
-            return false;
-        }
+    // 2) GNSS време
+    if (!gps_get_time(&utc)) {
+        ESP_LOGW(TAG, "GNSS: no time → skip sync");
+        return false;
     }
 
-    struct tm t = {
-        .tm_year = gps.year - 1900,
-        .tm_mon  = gps.month - 1,
-        .tm_mday = gps.day,
-        .tm_hour = gps.hour,
-        .tm_min  = gps.min,
-        .tm_sec  = gps.sec
-    };
-
-    // GPS UTC → epoch UTC
-    char old_tz[64] = {0};
-    char *env_tz = getenv("TZ");
-    if (env_tz)
-        strncpy(old_tz, env_tz, sizeof(old_tz) - 1);
-
+    // 3) GNSS UTC → epoch
     setenv("TZ", "UTC", 1);
     tzset();
+    time_t epoch = mktime(&utc);
 
-    time_t epoch = mktime(&t);
-
-    if (old_tz[0])
-        setenv("TZ", old_tz, 1);
-    else
-        unsetenv("TZ");
-    tzset();
-
-    if (epoch <= 0)
+    if (epoch <= 0) {
+        ESP_LOGW(TAG, "GNSS: invalid epoch");
         return false;
+    }
 
-    // Пишем UTC в DS3231
-    ds3231_set_time(&t);
+    // 4) Пишем UTC в DS3231
+    ds3231_set_time(&utc);
 
-    // Системен часовник = UTC
+    // 5) Системен часовник = UTC
     struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
     settimeofday(&tv, NULL);
 
-    // Приложи TZ по GPS координати
-    apply_timezone_from_gps(gps.lat, gps.lon);
-    tzset();   // <<< FIX: гарантира локално време за всички задачи
+    // 6) Приложи timezone според координатите
+    apply_timezone_from_gps(lat, lon);
+    tzset();
+
+    // 7) Обнови UI
     update_ui_time();
 
     g_time_from_gps = true;
     g_time_ready = true;
 
-    ESP_LOGI(TAG, "GPS → RTC sync complete (UTC)");
+    ESP_LOGI(TAG, "GNSS → RTC sync complete (UTC)");
     return true;
 }
 
@@ -223,16 +193,16 @@ void time_sync_init(void)
     } else {
         setenv("TZ", "UTC", 1);
         tzset();
-        ESP_LOGW(TAG, "No stored coords → TZ=UTC until GPS fix");
+        ESP_LOGW(TAG, "No stored coords → TZ=UTC until GNSS fix");
     }
 
     if (load_time_from_rtc()) {
-        tzset();   // <<< FIX: прилагаме TZ след RTC
+        tzset();
         ESP_LOGI(TAG, "Time loaded from RTC");
         return;
     }
 
-    ESP_LOGW(TAG, "RTC has no valid time, waiting for GPS...");
+    ESP_LOGW(TAG, "RTC has no valid time, waiting for GNSS...");
 }
 
 // ===============================
@@ -242,22 +212,15 @@ void time_sync_task(void *arg)
 {
     ESP_LOGI(TAG, "Time sync task started");
 
-    if (g_time_ready) {
-        for (int i = 0; i < 30; i++) {
-            if (sync_rtc_from_gps()) {
-                ESP_LOGI(TAG, "Startup GPS sync → DS3231 updated");
-                break;
-            }
-            vTaskDelay(pdMS_TO_TICKS(500));
-        }
-    }
-
-    while (!g_time_ready) {
-        if (sync_rtc_from_gps()) {
-            ESP_LOGI(TAG, "Initial GPS sync complete");
-            tzset();   // <<< FIX: гарантира локално време
+    // Винаги чакаме първия GPS Fix, дори ако RTC вече е зареден.
+    while (!g_time_from_gps)
+    {
+        if (sync_rtc_from_gps())
+        {
+            ESP_LOGI(TAG, "Initial GNSS sync complete");
             break;
         }
+
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
@@ -267,53 +230,40 @@ void time_sync_task(void *arg)
     for (;;) {
         update_ui_time();
 
-		// ===================== HOURLY CHIME =====================
-		time_t now_epoch;
-		time(&now_epoch);
-		
-		struct tm local;
-		localtime_r(&now_epoch, &local);
-		
-		static int last_hour = -1;
-		
-		// Ако екранът е димиран → не казваме часа
-		if (app_state.dimming_active)
-		{
-			// Обновяваме last_hour, за да не се натрупва
-			if (local.tm_hour != last_hour)
-				last_hour = local.tm_hour;
-		
-			// НЕ правим continue → оставяме задачата да стигне до vTaskDelay()
-		}
-		else
-		{
-			// Ако часът се е сменил → казваме го
-			if (local.tm_hour != last_hour)
-			{
-				last_hour = local.tm_hour;
-		
-				int hour = local.tm_hour;  // 0–23
-				int hour_index = (hour == 0) ? 23 : (hour - 1);
-		
-				ESP_LOGI("TIME", "HOURLY CHIME: hour=%d (index=%d)",
-						hour, hour_index);
-		
-				audio_play_event(AUDIO_EVENT_HOUR_01 + hour_index);
-			}
-		}
+        // ===================== HOURLY CHIME =====================
+        time_t now_epoch;
+        time(&now_epoch);
 
+        struct tm local;
+        localtime_r(&now_epoch, &local);
 
+        static int last_hour = -1;
 
+        if (app_state.dimming_active) {
+            if (local.tm_hour != last_hour)
+                last_hour = local.tm_hour;
+        } else {
+            if (local.tm_hour != last_hour) {
+                last_hour = local.tm_hour;
 
+                int hour = local.tm_hour;
+                int hour_index = (hour == 0) ? 23 : (hour - 1);
 
-        // ===================== DAILY GPS SYNC =====================
+                ESP_LOGI("TIME", "HOURLY CHIME: hour=%d (index=%d)",
+                         hour, hour_index);
+
+                audio_play_event(AUDIO_EVENT_HOUR_01 + hour_index);
+            }
+        }
+
+        // ===================== DAILY GNSS SYNC =====================
         time_t now;
         time(&now);
 
         if (now - last_sync > 24 * 3600) {
             if (sync_rtc_from_gps()) {
                 last_sync = now;
-                ESP_LOGI(TAG, "Daily GPS sync done");
+                ESP_LOGI(TAG, "Daily GNSS sync done");
             }
         }
 

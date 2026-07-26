@@ -7,6 +7,7 @@ idf_component_register(
         "wifi"
         "weather"
         "location"
+        
     REQUIRES 
         esp_wifi 
         nvs_flash 
@@ -20,5 +21,6 @@ idf_component_register(
         ui
         audio
         ota
-        
+        sim_a7670
+        gps
 )

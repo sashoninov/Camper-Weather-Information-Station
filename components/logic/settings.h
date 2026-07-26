@@ -18,8 +18,7 @@ typedef struct {
     uint8_t end_hour;
     uint8_t end_min;
 
-    char wifi_ssid[32];
-    char wifi_pass[64];
+
     
 } settings_t;
 

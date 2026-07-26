@@ -104,8 +104,8 @@ void ui_update_weather(void * param)
     if (ui_SunsetCurrent)
         lv_label_set_text(ui_SunsetCurrent, app_state.weather.sunset[0]);
 
-    if (ui_Pressure4)
-        lv_label_set_text_fmt(ui_Pressure4, "%.0f", app_state.weather.pressure);
+    //if (ui_Pressure4)
+    //    lv_label_set_text_fmt(ui_Pressure4, "%.0f", app_state.weather.pressure);
 
     if (ui_WeatherIcon)
         lv_img_set_src(ui_WeatherIcon,
@@ -144,6 +144,10 @@ void ui_update_weather(void * param)
         if (!hourly_chart)
         {
             hourly_chart = lv_hourly_chart_create(ui_HourlyChart);
+			lv_obj_add_event_cb(hourly_chart,
+								global_touch_handler,
+								LV_EVENT_ALL,
+								NULL);
             lv_coord_t w = lv_obj_get_content_width(ui_HourlyChart);
 			lv_coord_t h = lv_obj_get_content_height(ui_HourlyChart);
 			
@@ -169,6 +173,10 @@ void ui_update_weather(void * param)
         if (!daily_chart)
         {
             daily_chart = lv_daily_chart_create(ui_DailyChart);
+			lv_obj_add_event_cb(daily_chart,
+								global_touch_handler,
+								LV_EVENT_ALL,
+								NULL);
 			lv_obj_set_style_pad_column(daily_chart, 4, 0);
 			lv_coord_t w = lv_obj_get_content_width(ui_DailyChart);
 			lv_coord_t h = lv_obj_get_content_height(ui_DailyChart);

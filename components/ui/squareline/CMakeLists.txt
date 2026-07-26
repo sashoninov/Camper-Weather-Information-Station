@@ -5,8 +5,9 @@ SET(SOURCES screens/ui_WeatherstationScreen.c
     ui_helpers.c
     ui_events.c
     images/ui_img_map_png.c
-    images/ui_img_wifi_png.c
+    images/ui_img_530950535.c
     images/ui_img_optimizing64_png.c
+    images/ui_img_wifi_png.c
     images/ui_img_04d_png.c
     images/ui_img_cloud_png.c
     images/ui_img_uv_png.c
@@ -25,6 +26,9 @@ SET(SOURCES screens/ui_WeatherstationScreen.c
     images/ui_img_1754312304.c
     images/ui_img_1221855485.c
     images/ui_img_freezing_png.c
+    images/ui_img_cooler_png.c
+    images/ui_img_669777041.c
+    images/ui_img_147745890.c
     images/ui_img_1617849300.c
     images/ui_img_157047313.c
     images/ui_img_1017807020.c
@@ -45,9 +49,18 @@ SET(SOURCES screens/ui_WeatherstationScreen.c
     images/ui_img_13n_png.c
     images/ui_img_50d_png.c
     images/ui_img_50n_png.c
+    images/ui_img_998318497.c
+    images/ui_img_998489662.c
+    images/ui_img_998386271.c
+    images/ui_img_998565636.c
+    images/ui_img_998461989.c
     images/ui_img_1706833765.c
     images/ui_img_battery_png.c
+    images/ui_img_1461797723.c
+    images/ui_img_mobile_png.c
     images/ui_img_optimizing_png.c
+    images/ui_img_488183857.c
+    images/ui_img_technology_png.c
     images/ui_img_1110708744.c
     images/ui_img_2072039010.c
     images/ui_img_2072040035.c

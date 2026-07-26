@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-#define DISPLAY_WIDTH   1280
-#define DISPLAY_HEIGHT  800
+#define DISPLAY_WIDTH   720
+#define DISPLAY_HEIGHT  1280
 
 esp_err_t display_init(void);
 lv_disp_t *display_get(void);

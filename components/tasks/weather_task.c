@@ -7,70 +7,75 @@
 #include "weather_coords.h"
 #include "storage_coords.h"
 
+#include "sim_a7670.h"
+#include "network_manager.h"
+
 #include <stdio.h>
 
 extern weather_data_t g_weather;
 
-#define WEATHER_INTERVAL_MS (15 * 60 * 1000) // 15 мин
+
+extern bool gsm_ready;
+
+// Обновяване на прогнозата на всеки 30 минути
+#define WEATHER_INTERVAL_MS (30 * 60 * 1000)
+
+// Ако няма никакви координати - нов опит след 5 минути
+#define WEATHER_RETRY_MS    (5 * 60 * 1000)
 
 void weather_task(void *arg)
 {
-    double lat = 0, lon = 0;
+    double lat = 0.0;
+    double lon = 0.0;
 
     while (1)
     {
-        bool wifi_ok, gps_ok;
+		app_state_lock();
+		double cached_lat = app_state.location.lat;
+		double cached_lon = app_state.location.lon;
+		app_state_unlock();
 
-        app_state_lock();
-        wifi_ok = app_state.wifi_connected;
-        gps_ok  = app_state.gps.valid;
-        app_state_unlock();
+        bool net_ok = network_has_internet();
 
-        // ================================
-        // 1) Ако няма WiFi → няма смисъл
-        // ================================
-        if (!wifi_ok) {
-            printf("⏳ Waiting for WiFi...\n");
+        if (!net_ok)
+        {
+            printf("⏳ Waiting for GSM connection...\n");
+
             vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         }
 
-        // ================================
-        // 2) Вземаме координати
-        // ================================
+        // Използваме последните координати от location_task
+        lat = cached_lat;
+        lon = cached_lon;
 
-        if (gps_ok && app_state.gps.valid)
+        // Ако няма GPS FIX - използваме последно записаните координати
+        if (lat == 0.0 && lon == 0.0)
         {
-            // GPS има FIX → използваме него
-            lat = app_state.gps.lat;
-            lon = app_state.gps.lon;
-
-            printf("📡 Using GPS: %.6f, %.6f\n", lat, lon);
-        }
-        else
-        {
-            // GPS няма FIX → опитваме NVS
-            float nvs_lat, nvs_lon;
+            float nvs_lat;
+            float nvs_lon;
 
             if (storage_load_coords(&nvs_lat, &nvs_lon))
             {
                 lat = nvs_lat;
                 lon = nvs_lon;
 
-                printf("💾 Using stored coords: %.6f, %.6f\n", lat, lon);
+                printf("💾 Using stored coordinates: %.6f, %.6f\n", lat, lon);
             }
             else
             {
-                // Няма GPS, няма NVS → изчакваме
-                printf("⚠️ No GPS/NVS coords → delaying weather...\n");
-                vTaskDelay(pdMS_TO_TICKS(60000)); // 1 минута
+                printf("⚠️ No GPS fix and no stored coordinates. Retry in 5 minutes.\n");
+
+                vTaskDelay(pdMS_TO_TICKS(WEATHER_RETRY_MS));
                 continue;
             }
         }
+        else
+        {
+            printf("📡 Using GPS coordinates: %.6f, %.6f\n", lat, lon);
+        }
 
-        // ================================
-        // 3) Заявка за времето
-        // ================================
+        // Изтегляне на прогнозата
         if (weather_process(lat, lon))
         {
             app_state_lock();
@@ -78,11 +83,15 @@ void weather_task(void *arg)
             app_state_unlock();
 
             lv_async_call(ui_update_weather, NULL);
+
+            printf("✅ Weather updated successfully.\n");
+        }
+        else
+        {
+            printf("⚠️ Weather update failed.\n");
         }
 
-        // ================================
-        // 4) Интервал
-        // ================================
+        // Следващо обновяване след 30 минути
         vTaskDelay(pdMS_TO_TICKS(WEATHER_INTERVAL_MS));
     }
 }

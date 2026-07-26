@@ -2,44 +2,67 @@
 #include "tank_levels.h"
 #include "ui_update_ina.h"
 #include "ui_update_mpu.h"
-#include "ui_update_scd41.h"
+#include "ui_update_environment.h"
 #include "ui_update_ds18b20.h"
 #include "ui_update_victron.h"
 #include "esp_lvgl_port.h"
 #include <math.h>
 
 #include "mpu6050.h"
-#include "scd41.h"
 #include "app_state.h"
 #include "calibration.h"
 #include "status.h"
-
+#include "environment.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 void sensor_task(void *arg)
 {
-    if (ina3221_init() != ESP_OK) {
+    if (ina3221_init() != ESP_OK)
+    {
         printf("❌ INA3221 init failed\n");
-    } else {
+    }
+    else
+    {
         printf("✅ INA3221 init OK\n");
     }
 
-    if (mpu6050_init() != ESP_OK) {
+    if (mpu6050_init() != ESP_OK)
+    {
         printf("❌ MPU6050 init failed\n");
-    } else {
+    }
+    else
+    {
         printf("✅ MPU6050 init OK\n");
+    }
+
+    // =========================
+    // ENVIRONMENT (BME680)
+    // =========================
+    if (!environment_init())
+    {
+        printf("❌ BME680 init failed\n");
+    }
+    else
+    {
+        printf("✅ BME680 init OK\n");
     }
 
     // =========================
     // LOAD CALIBRATION FROM NVS
     // =========================
-    if (calibration_load()) {
+    if (calibration_load())
+    {
         calibration_data_t c;
         calibration_get(&c);
-        printf("Loaded calibration: pitch=%.2f roll=%.2f\n", c.pitch_offset, c.roll_offset);
-    } else {
+
+        printf("Loaded calibration: pitch=%.2f roll=%.2f\n",
+               c.pitch_offset,
+               c.roll_offset);
+    }
+    else
+    {
         printf("No calibration found in NVS\n");
     }
 
@@ -47,7 +70,6 @@ void sensor_task(void *arg)
     mpu6050_data_t mpu;
 
     uint32_t last_ina = 0;
-    uint32_t last_scd = 0;
 
     static uint32_t calib_done_time = 0;
     static bool motion_detected = false;
@@ -75,7 +97,8 @@ void sensor_task(void *arg)
             calibration_save();
 
             printf("✅ MPU calibrated and saved: pitch=%.2f roll=%.2f\n",
-                   c.pitch_offset, c.roll_offset);
+                   c.pitch_offset,
+                   c.roll_offset);
 
             app_state.calibration_done = true;
             calib_done_time = xTaskGetTickCount();
@@ -103,9 +126,13 @@ void sensor_task(void *arg)
                 bool allow_water_update = true;
 
                 if (motion_detected)
+                {
                     allow_water_update = false;
+                }
                 else if (xTaskGetTickCount() - motion_stop_time < pdMS_TO_TICKS(3000))
+                {
                     allow_water_update = false;
+                }
 
                 float grey;
                 float clean;
@@ -131,8 +158,8 @@ void sensor_task(void *arg)
 
             last_ina = now;
         }
-
-        // =========================
+		
+	        // =========================
         // MPU6050
         // =========================
         if (mpu6050_read(&mpu) == ESP_OK)
@@ -173,7 +200,6 @@ void sensor_task(void *arg)
             g_status.pitch = pitch_f;
             g_status.roll  = roll_f;
 
-
             app_state.mpu.pitch = pitch_f;
             app_state.mpu.roll  = roll_f;
 
@@ -189,16 +215,40 @@ void sensor_task(void *arg)
         }
 
         // =========================
-        // UI UPDATE SCD41
+        // ENVIRONMENT (BME680)
+        // =========================
+        static uint32_t last_environment = 0;
+        static bool env_error = false;
+
+        if (now - last_environment > pdMS_TO_TICKS(5000))
+        {
+            if (!environment_update())
+            {
+                if (!env_error)
+                {
+                    printf("⚠️ Environment update failed\n");
+                    env_error = true;
+                }
+            }
+            else
+            {
+                env_error = false;
+            }
+
+            last_environment = now;
+        }
+
+        // =========================
+        // UI UPDATE environment
         // =========================
         static uint32_t last_ui = 0;
-        
+
         if (now - last_ui > pdMS_TO_TICKS(1000))
         {
             lvgl_port_lock(0);
-            ui_update_scd41();
+            ui_update_environment();
             lvgl_port_unlock();
-        
+
             last_ui = now;
         }
 
@@ -214,19 +264,19 @@ void sensor_task(void *arg)
             lvgl_port_unlock();
 
             last_ds_ui = now;
-        }
-
-        // =========================
+        }	
+		
+		        // =========================
         // UI UPDATE VICTRON
-        // =========================        
+        // =========================
         static uint32_t last_victron_ui = 0;
-        
+
         if (now - last_victron_ui > pdMS_TO_TICKS(1000))
         {
             lvgl_port_lock(0);
             ui_update_victron();
             lvgl_port_unlock();
-        
+
             last_victron_ui = now;
         }
 

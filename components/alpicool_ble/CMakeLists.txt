@@ -1,0 +1,15 @@
+idf_component_register(
+    SRCS
+        "alpicool.c"
+        "alpicool_ble.c"
+        "alpicool_packet.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        esp_timer
+        driver
+        freertos
+        bt
+        nvs_flash
+        ui
+)

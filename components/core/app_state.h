@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "weather.h"
-#include "gps.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,11 +11,20 @@ extern "C" {
 // =====================
 // SENSOR DATA
 // =====================
-typedef struct {
+typedef struct
+{
+    bool valid;
+
+    // Environmental data
     float temperature;
     float humidity;
     float pressure;
-    int co2;
+
+    // BME680
+    float gas_resistance;      // Ω
+    uint16_t iaq;              // Air Quality Index
+    uint8_t air_quality_level; // 0..4
+
 } sensor_data_t;
 
 // =====================
@@ -49,7 +57,6 @@ typedef struct {
     weather_data_t weather;
     location_data_t location;
 
-    gps_data_t gps; 
     mpu_data_t mpu;
 
     // 🔥 INA
@@ -68,25 +75,21 @@ typedef struct {
     char date_str[32];
     char weekday_str[32];
 
-    bool hourly_chime_enabled;   // 🔔 от настройките
-    int last_hour_chime;         // последният час, за който е пуснат звук
-    bool dimming_active;         // дали екранът е димиран
+    bool hourly_chime_enabled;
+    int last_hour_chime;
+    bool dimming_active;
 
     bool wifi_connected;
     bool time_synced;
 
-    // 🌬️ SCD41
-    bool scd_valid;
-    uint16_t co2;
-    float scd_temp;
-    float scd_humidity;
 
-    // 🌡️ DS18B20 (3 сензора по име)
+
+    // 🌡️ DS18B20 (3 сензора)
     #define DS_MAX 3
     bool ds_valid[DS_MAX];
     float ds_temp[DS_MAX];
 
-    // ❄️ Fridge #2 (хладилна камера) alert flag
+    // ❄️ Fridge #2 alert flag
     bool fridge2_temp_alerted;
 
     // 🔋 Victron MPPT
@@ -107,7 +110,7 @@ typedef struct {
     // 🚽 WC alert flag
     bool wc_full_alerted;
 
-    // 🔊 GPS audio flags
+    // 🔊 GPS audio flags (остават, но вече не са свързани с gps_data_t)
     bool gps_fix_alerted;
     bool gps_lost_alerted;
 
@@ -118,7 +121,6 @@ typedef struct {
     bool victron_batt_low_alerted;
     bool victron_batt_critical_alerted;
 
-    
 } app_state_t;
 
 // =====================

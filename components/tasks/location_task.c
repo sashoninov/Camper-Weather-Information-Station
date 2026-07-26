@@ -8,6 +8,14 @@
 
 #include "app_state.h"
 #include "location.h"
+#include "network_manager.h"
+
+#include "sim_a7670.h"
+#include "gps.h"
+
+
+
+extern bool gsm_ready;
 
 // ==============================
 // CONFIG
@@ -31,11 +39,11 @@ static double distance_km(double lat1, double lon1, double lat2, double lon2)
     double dLat = deg2rad(lat2 - lat1);
     double dLon = deg2rad(lon2 - lon1);
 
-    double a = sin(dLat/2) * sin(dLat/2) +
+    double a = sin(dLat / 2) * sin(dLat / 2) +
                cos(deg2rad(lat1)) * cos(deg2rad(lat2)) *
-               sin(dLon/2) * sin(dLon/2);
+               sin(dLon / 2) * sin(dLon / 2);
 
-    double c = 2 * atan2(sqrt(a), sqrt(1-a));
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
     return EARTH_RADIUS_KM * c;
 }
@@ -53,12 +61,13 @@ void location_task(void *arg)
 
     while (1)
     {
-        // 1) Ако няма WiFi → няма смисъл да викаме API
-        app_state_lock();
-        bool wifi_ok = app_state.wifi_connected;
-        app_state_unlock();
+        // ================================
+        // 1) Проверка за мрежа (WiFi или GSM)
+        // ================================
 
-        if (!wifi_ok)
+
+        bool net_ok = network_has_internet();
+        if (!net_ok)
         {
             vTaskDelay(pdMS_TO_TICKS(LOCATION_CHECK_INTERVAL_MS));
             continue;
@@ -66,59 +75,59 @@ void location_task(void *arg)
 
         int64_t now = esp_timer_get_time() / 1000;
 
-        double lat = 0;
-        double lon = 0;
-        bool gps_valid = false;
+        double lat = 0.0;
+        double lon = 0.0;
 
-        // 2) Четем GPS от app_state
+        // ================================
+        // 2) Вземаме координати от GPS
+        // ================================
+        if (!gps_get_location(&lat, &lon))
+        {
+            printf("❌ GNSS: no coordinates\n");
+            vTaskDelay(pdMS_TO_TICKS(LOCATION_CHECK_INTERVAL_MS));
+            continue;
+        }
+
+        // Записваме координатите глобално
         app_state_lock();
-        lat = app_state.gps.lat;
-        lon = app_state.gps.lon;
-        gps_valid = app_state.gps.valid;
+        app_state.location.lat = lat;
+        app_state.location.lon = lon;
         app_state_unlock();
 
         bool need_update = false;
 
-        // 👉 първо стартиране
-        if (!has_fix && gps_valid)
+        // Първо стартиране
+        if (!has_fix)
         {
             need_update = true;
         }
 
-        // 👉 на 6 часа
+        // Обновяване на всеки 6 часа
         if ((now - last_update) > LOCATION_REFRESH_INTERVAL_MS)
         {
             need_update = true;
         }
 
-        // 👉 движение > 30 км
-        if (gps_valid && has_fix)
+        // Проверка за движение > 30 km
+        if (has_fix)
         {
             double dist = distance_km(last_lat, last_lon, lat, lon);
 
             if (dist > LOCATION_MOVE_THRESHOLD_KM)
             {
-                printf("📍 GPS moved: %.2f km\n", dist);
+                printf("📍 GNSS moved: %.2f km\n", dist);
                 need_update = true;
             }
         }
 
-        // ==========================
+        // ================================
         // UPDATE
-        // ==========================
-        if (need_update && gps_valid)
+        // ================================
+        if (need_update)
         {
             printf("📍 Updating location via Open-Meteo...\n");
+            printf("📡 GNSS coords: %.6f, %.6f\n", lat, lon);
 
-            // записваме GPS координати
-            app_state_lock();
-            app_state.location.lat = lat;
-            app_state.location.lon = lon;
-            app_state_unlock();
-
-            printf("📡 GPS coords: %.5f, %.5f\n", lat, lon);
-
-            // ⭐ ТУК ВИКАМЕ Open-Meteo
             if (location_fetch() == ESP_OK)
             {
                 printf("🌍 Open-Meteo location updated\n");
@@ -128,7 +137,6 @@ void location_task(void *arg)
                 printf("⚠️ Open-Meteo location failed\n");
             }
 
-            // update cache
             last_lat = lat;
             last_lon = lon;
 

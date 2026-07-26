@@ -11,7 +11,8 @@ idf_component_register(
         audio
         sdcard
         ota
-       
+        alpicool_ble
+        gps
         
 )
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)

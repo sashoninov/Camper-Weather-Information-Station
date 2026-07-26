@@ -12,9 +12,9 @@ void app_state_init(void)
     memset(&app_state, 0, sizeof(app_state));
 
     // ===================== CUSTOM DEFAULTS =====================
-    app_state.hourly_chime_enabled = false;   // по подразбиране изключено
-    app_state.last_hour_chime = -1;           // още не е пускан звук
-    app_state.dimming_active = false;         // екранът не е димиран
+    app_state.hourly_chime_enabled = false;
+    app_state.last_hour_chime = -1;
+    app_state.dimming_active = false;
 }
 
 void app_state_lock(void)

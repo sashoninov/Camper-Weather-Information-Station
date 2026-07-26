@@ -8,7 +8,7 @@ idf_component_register(
         "charts"
         "weather"
 		"config"
-    REQUIRES lvgl core network  audio ota
+    REQUIRES lvgl core network alpicool_ble  audio ota sim_a7670 gps
 )
 
 # 🔥 FIX за SquareLine

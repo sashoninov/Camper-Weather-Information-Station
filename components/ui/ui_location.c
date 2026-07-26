@@ -3,8 +3,7 @@
 #include "app_state.h"
 #include "ui.h"   // SquareLine генериран
 
-#include "audio_manager.h"
-#include "audio_events.h"
+
 
 
 
@@ -36,44 +35,3 @@ void ui_update_location(void)
     lvgl_port_unlock();
 }
 
-void ui_update_wifi_icon(void)
-{
-    bool wifi_ok;
-
-    app_state_lock();
-    wifi_ok = app_state.wifi_connected;
-    app_state_unlock();
-
-        // ===================== AUDIO WIFI EVENTS =====================
-
-    if (wifi_ok) {
-        // CONNECTED
-        if (!app_state.wifi_alerted_connected) {
-            audio_play_event(AUDIO_EVENT_WIFI_CONNECTED);
-            app_state.wifi_alerted_connected = true;
-            app_state.wifi_alerted_lost = false;
-        }
-    } else {
-        // LOST
-        if (!app_state.wifi_alerted_lost) {
-            audio_play_event(AUDIO_EVENT_WIFI_DISCONNECTED);
-            app_state.wifi_alerted_lost = true;
-            app_state.wifi_alerted_connected = false;
-        }
-    }
-
-    // ===================== UI UPDATE =====================
-
-    lvgl_port_lock(0);
-
-    if (wifi_ok) {
-        lv_img_set_src(ui_Image9, &ui_img_wifi1_png);
-        
-        
-    } else {
-        lv_img_set_src(ui_Image9, &ui_img_wifi_png);
-        
-    }
-
-    lvgl_port_unlock();
-}

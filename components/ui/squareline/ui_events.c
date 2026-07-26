@@ -9,3 +9,13 @@ void global_touch_handler(lv_event_t * e)
 {
 	// Your code here
 }
+
+void ui_event_power(lv_event_t * e)
+{
+	// Your code here
+}
+
+void ui_event_mode(lv_event_t * e)
+{
+	// Your code here
+}

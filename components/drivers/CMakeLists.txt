@@ -2,7 +2,7 @@ idf_component_register(
     SRCS
         "i2c/i2c_bus.c"
         "i2c/i2c_bus1.c"
-        "sensors/scd41.c"
+      
         "sensors/bh1750.c"
         "sensors/ina3221.c"
         "sensors/mpu6050.c"
@@ -10,7 +10,7 @@ idf_component_register(
         "sensors/ds18b20.c"
         "sensors/victron_driver.c"
         "clock/ds3231.c" 
-        "gps/gps.c"
+        "bme680/bme680.c"
 
     INCLUDE_DIRS
         "."
@@ -18,8 +18,9 @@ idf_component_register(
         "sensors"
         "display"
         "clock"
+        "bme680"
         
-        "gps"
+        
 
     REQUIRES 
         esp_driver_i2c
@@ -33,4 +34,6 @@ idf_component_register(
         logic
         onewire_bus      
         ds18b20 
+		waveshare__esp_lcd_hx8394
+        francisduvivier__bme68x_sensorapi_espidf
 )

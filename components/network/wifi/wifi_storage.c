@@ -1,63 +1,133 @@
+/******************************************************************************
+ *
+ * wifi_storage.c
+ *
+ * Camper Weather Station
+ * ESP32-P4
+ *
+ * SoftAP configuration storage
+ *
+ ******************************************************************************/
+
 #include "wifi_storage.h"
+
 #include "nvs.h"
 #include "nvs_flash.h"
+
 #include <string.h>
 
-#define WIFI_NAMESPACE "wifi"
+#define WIFI_NAMESPACE    "wifi"
 
-esp_err_t wifi_save_credentials(const char *ssid, const char *pass)
+/******************************************************************************
+ * Factory defaults
+ ******************************************************************************/
+
+static void wifi_set_defaults(softap_config_t *cfg)
 {
-    if (!ssid || !pass)
+    memset(cfg, 0, sizeof(softap_config_t));
+
+    strlcpy(cfg->password,
+            WIFI_DEFAULT_PASSWORD,
+            sizeof(cfg->password));
+}
+
+/******************************************************************************
+ * Load configuration
+ ******************************************************************************/
+
+esp_err_t wifi_load_ap_config(softap_config_t *cfg)
+{
+    if (cfg == NULL)
+    {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    wifi_set_defaults(cfg);
 
     nvs_handle_t nvs;
-    esp_err_t err = nvs_open(WIFI_NAMESPACE, NVS_READWRITE, &nvs);
+
+    esp_err_t err = nvs_open(WIFI_NAMESPACE,
+                             NVS_READONLY,
+                             &nvs);
+
     if (err != ESP_OK)
-        return err;
+    {
+        /* First boot -> use defaults */
+        return ESP_OK;
+    }
 
-    err = nvs_set_str(nvs, "ssid", ssid);
-    if (err != ESP_OK) {
+    size_t len;
+
+    len = sizeof(cfg->password);
+
+    err = nvs_get_str(nvs,
+                      "password",
+                      cfg->password,
+                      &len);
+
+    if (err != ESP_OK)
+    {
+        strlcpy(cfg->password,
+                WIFI_DEFAULT_PASSWORD,
+                sizeof(cfg->password));
+    }
+
+    nvs_close(nvs);
+
+    return ESP_OK;
+}
+
+/******************************************************************************
+ * Save configuration
+ ******************************************************************************/
+
+esp_err_t wifi_save_ap_config(const softap_config_t *cfg)
+{
+    if (cfg == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t nvs;
+
+    esp_err_t err = nvs_open(WIFI_NAMESPACE,
+                             NVS_READWRITE,
+                             &nvs);
+
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+
+    err = nvs_set_str(nvs,
+                      "password",
+                      cfg->password);
+				  
+
+    if (err != ESP_OK)
+    {
         nvs_close(nvs);
         return err;
     }
 
-    err = nvs_set_str(nvs, "pass", pass);
-    if (err != ESP_OK) {
-        nvs_close(nvs);
-        return err;
-    }
+
 
     err = nvs_commit(nvs);
+
     nvs_close(nvs);
 
     return err;
 }
 
-esp_err_t wifi_load_credentials(char *ssid, char *pass)
+/******************************************************************************
+ * Restore factory defaults
+ ******************************************************************************/
+
+esp_err_t wifi_reset_ap_config(void)
 {
-    if (!ssid || !pass)
-        return ESP_ERR_INVALID_ARG;
+    softap_config_t cfg;
 
-    nvs_handle_t nvs;
-    esp_err_t err = nvs_open(WIFI_NAMESPACE, NVS_READONLY, &nvs);
-    if (err != ESP_OK)
-        return err;
+    wifi_set_defaults(&cfg);
 
-    size_t ssid_len = WIFI_SSID_MAX;
-    size_t pass_len = WIFI_PASS_MAX;
-
-    err = nvs_get_str(nvs, "ssid", ssid, &ssid_len);
-    if (err != ESP_OK) {
-        nvs_close(nvs);
-        return err;
-    }
-
-    err = nvs_get_str(nvs, "pass", pass, &pass_len);
-    if (err != ESP_OK) {
-        nvs_close(nvs);
-        return err;
-    }
-
-    nvs_close(nvs);
-    return ESP_OK;
+    return wifi_save_ap_config(&cfg);
 }

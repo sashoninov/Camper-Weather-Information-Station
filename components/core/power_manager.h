@@ -12,6 +12,7 @@ void power_manager_init(void);
 void power_manager_task(void *arg);
 void power_manager_force_sleep(void);
 void power_manager_force_wake(void);
+void power_manager_ble_disconnected(void);
 
 #ifdef __cplusplus
 }

@@ -6,7 +6,7 @@
 #include <math.h>
 #include "calibration.h"
 
-#define MPU6050_ADDR     0x69
+#define MPU6050_ADDR     0x69   //0x69
 #define REG_PWR_MGMT_1   0x6B
 #define REG_ACCEL_XOUT   0x3B
 
@@ -52,8 +52,8 @@ static esp_err_t mpu_i2c_safe_transmit(const uint8_t *data, size_t len)
         esp_err_t err = i2c_master_transmit(dev, data, len, 100);
         if (err == ESP_OK) return ESP_OK;
 
-        ESP_LOGW(TAG, "I2C transmit failed (%s), retry %d/3",
-                 esp_err_to_name(err), i + 1);
+        //ESP_LOGW(TAG, "I2C transmit failed (%s), retry %d/3",
+        //         esp_err_to_name(err), i + 1);
 
         i2c_master_bus_reset(g_i2c1_bus);
         vTaskDelay(pdMS_TO_TICKS(5));
@@ -87,7 +87,7 @@ esp_err_t mpu6050_read(mpu6050_data_t *out)
     // Set register pointer
     esp_err_t err = mpu_i2c_safe_transmit(&reg, 1);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set register pointer");
+        //ESP_LOGE(TAG, "Failed to set register pointer");
         return err;
     }
 

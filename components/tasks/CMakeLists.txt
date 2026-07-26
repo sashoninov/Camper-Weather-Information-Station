@@ -5,13 +5,13 @@ idf_component_register(
         "location_task.c"
 		"sensor_task.c"
 		"brightness_task.c"
-        "scd41_task.c"
+
         "ds18b20_task.c"
         "victron_task.c"
-        "gps_raw_logger.c"
+        
         
         
 
     INCLUDE_DIRS "."
-    REQUIRES core ui logic network driver ota
+    REQUIRES core ui logic network driver ota sim_a7670 environment
 )

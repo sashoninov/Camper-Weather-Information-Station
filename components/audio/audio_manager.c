@@ -49,9 +49,28 @@ static bool play_wav_file(const char *path)
 
     ESP_LOGI(TAG, "Playing: %s", path);
 
-    while ((bytes_read = fread(buffer, 1, sizeof(buffer), f)) > 0) {
-        esp_codec_dev_write(audio_dev, buffer, bytes_read);
-    }
+	while ((bytes_read = fread(buffer, 1, sizeof(buffer), f)) > 0) {
+	
+		// bytes_read = mono bytes
+		int mono_samples = bytes_read / 2;  // 16-bit mono
+	
+		// Allocate stereo buffer
+		int stereo_bytes = mono_samples * 2 * sizeof(int16_t);
+		int16_t *stereo_buf = heap_caps_malloc(stereo_bytes, MALLOC_CAP_DEFAULT);
+	
+		int16_t *mono = (int16_t *)buffer;
+	
+		for (int i = 0; i < mono_samples; i++) {
+			int16_t s = mono[i];
+			stereo_buf[2*i]     = s;  // Left
+			stereo_buf[2*i + 1] = s;  // Right
+		}
+	
+		esp_codec_dev_write(audio_dev, stereo_buf, stereo_bytes);
+	
+		free(stereo_buf);
+	}
+
 
     fclose(f);
     return true;
