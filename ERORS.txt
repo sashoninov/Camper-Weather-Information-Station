@@ -19,3 +19,49 @@
 (4114) I2C_SCAN: Found device at 0x77 
 (4118) I2C_SCAN:   CHIP ID = 0x58 
 (4121) I2C_SCAN:   -> BMP280
+
+
+използван хардуер
+
+ основния компонент на системата е
+ 
+ESP32-P4-Module High-performance Development Board, Based On ESP32-P4 And ESP32-C6, Supports Wi-Fi 6 And Bluetooth 5/BLE
+https://www.waveshare.com/esp32-p4-module-dev-kit.htm?srsltid=AfmBOooXO1gcZ95H76G10vcrTli3m9XoD4qQeatHZypbfZcwjPw9f9YV
+
+или 
+
+ESP32-P4-WIFI6-DEV-KIT High-Performance Development Board, Based On ESP32-P4 and ESP32-C6, Supports Wi-Fi 6 And Bluetooth 5 / BLE 5
+https://www.waveshare.com/esp32-p4-wifi6-dev-kit.htm
+
+ дисплей 
+ 
+10.1-DSI-TOUCH-A
+https://www.waveshare.com/wiki/10.1-DSI-TOUCH-A?srsltid=AfmBOoqrzwA3jp9QtOYCkvzTsSMdRWBCpN_2Twp083pjUbK3cYGpyHqZ
+
+или за разработка 
+
+5-DSI-TOUCH-A
+https://www.waveshare.com/wiki/5-DSI-TOUCH-A?srsltid=AfmBOoo1f08Prwm20-HlyTk9cygRM4cxEUs9bcBV8-W91Wp1Z-Iuanu-
+
+сензори 
+
+ds3231 часовник 
+
+bme680 температура влажност налягане IAQ в кемпера 
+
+bh1750 осветеност регулира яркоста на дисплея 
+
+ds18b20 температура един за външната температура и един за температурата в камерата на хладилника 
+
+ina3221 с него следим старт батерията и нивата на резервоарите за сива и чиста вода 
+
+mpu6050 жироскоп ползваме го за нивелиране на кемпера 
+
+VICTRON през UART следим статуса на кемперната батерия  соларната система консумацията .....
+
+Simcom A7670e 4g GSM модем през UART ползваме го за достъп до интернет хттп заявки за прогноза за времето и за GPS през друг UART
+https://www.and-global.com/list_23/568.html
+
+
+
+
