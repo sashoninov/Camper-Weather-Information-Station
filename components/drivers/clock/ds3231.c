@@ -1,14 +1,15 @@
-#include "ds3231.h"   // можеш да го преименуваш на ds1307.h ако искаш
+#include "ds3231.h"
 #include "esp_log.h"
 #include "i2c_bus1.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define DS1307_ADDR 0x68
 
-static const char *TAG = "DS1307";
+#define DS3231_ADDR 0x68
 
-static i2c_master_dev_handle_t ds1307_dev = NULL;
+static const char *TAG = "DS3231";
+
+static i2c_master_dev_handle_t ds3231_dev = NULL;
 extern i2c_master_bus_handle_t g_i2c1_bus;
 
 /* =========================================================
@@ -17,7 +18,7 @@ extern i2c_master_bus_handle_t g_i2c1_bus;
 static esp_err_t ds_safe_tx(const uint8_t *data, size_t len)
 {
     for (int i = 0; i < 3; i++) {
-        esp_err_t err = i2c_master_transmit(ds1307_dev, data, len, 100);
+        esp_err_t err = i2c_master_transmit(ds3231_dev, data, len, 100);
         if (err == ESP_OK) return ESP_OK;
 
         ESP_LOGW(TAG, "TX failed (%s), retry %d/3",
@@ -32,7 +33,7 @@ static esp_err_t ds_safe_tx(const uint8_t *data, size_t len)
 static esp_err_t ds_safe_rx(uint8_t *data, size_t len)
 {
     for (int i = 0; i < 3; i++) {
-        esp_err_t err = i2c_master_receive(ds1307_dev, data, len, 100);
+        esp_err_t err = i2c_master_receive(ds3231_dev, data, len, 100);
         if (err == ESP_OK) return ESP_OK;
 
         ESP_LOGW(TAG, "RX failed (%s), retry %d/3",
@@ -60,9 +61,9 @@ static uint8_t bin2bcd(uint8_t val)
 /* =========================================================
    INIT
    ========================================================= */
-bool ds3231_init(void)   // оставям името за съвместимост
+bool ds3231_init(void)
 {
-    if (ds1307_dev != NULL)
+    if (ds3231_dev != NULL)
         return true;
 
     if (!g_i2c1_bus) {
@@ -72,16 +73,26 @@ bool ds3231_init(void)   // оставям името за съвместимо�
 
     i2c_device_config_t cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = DS1307_ADDR,
+        .device_address = DS3231_ADDR,
         .scl_speed_hz = 100000,
     };
 
-    if (i2c_master_bus_add_device(g_i2c1_bus, &cfg, &ds1307_dev) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to add DS1307 device");
+    if (i2c_master_bus_add_device(g_i2c1_bus, &cfg, &ds3231_dev) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add DS3231 device");
         return false;
     }
 
-    ESP_LOGI(TAG, "DS1307 initialized");
+    ESP_LOGI(TAG, "DS3231 initialized");
+
+    // Read status register (safe)
+    uint8_t reg = 0x0F;
+    uint8_t status = 0;
+
+    if (ds_safe_tx(&reg, 1) == ESP_OK &&
+        ds_safe_rx(&status, 1) == ESP_OK)
+    {
+        ESP_LOGI(TAG, "STATUS REG = 0x%02X", status);
+    }
 
     return true;
 }
@@ -103,7 +114,7 @@ bool ds3231_get_time(struct tm *out)
     if (ds_safe_rx(buf, sizeof(buf)) != ESP_OK)
         return false;
 
-    ESP_LOGI("DS1307_RAW",
+    ESP_LOGI("DS3231_RAW",
              "REGS: %02X %02X %02X %02X %02X %02X %02X",
              buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
 
@@ -137,11 +148,11 @@ bool ds3231_set_time(const struct tm *in)
     data[7] = bin2bcd(in->tm_year - 100);
 
     if (ds_safe_tx(data, sizeof(data)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write DS1307 time");
+        ESP_LOGE(TAG, "Failed to write DS3231 time");
         return false;
     }
 
-    ESP_LOGI(TAG, "DS1307 time updated");
+    ESP_LOGI(TAG, "DS3231 time updated");
     return true;
 }
 

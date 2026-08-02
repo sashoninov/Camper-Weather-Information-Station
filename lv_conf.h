@@ -9,7 +9,7 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
-#define LV_CONF_INCLUDE_SIMPLE
+// #define LV_CONF_INCLUDE_SIMPLE
 
 #include <stdint.h>
 

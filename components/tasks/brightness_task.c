@@ -12,6 +12,7 @@
 
 static uint8_t current_brightness = 0;
 static const char *TAG = "BRIGHTNESS";
+static bool display_is_off = false;
 
 void brightness_task(void *pv)
 {
@@ -40,9 +41,26 @@ void brightness_task(void *pv)
             current_brightness -= (diff < -3) ? 3 : 1;
         }
 
-        if (!power_sleep_active)
+		if (!power_sleep_active)
 		{
-			display_set_brightness(current_brightness);
+			if (current_brightness == 0)
+			{
+				if (!display_is_off)
+				{
+					display_off();
+					display_is_off = true;
+				}
+			}
+			else
+			{
+				if (display_is_off)
+				{
+					display_on();
+					display_is_off = false;
+				}
+		
+				display_set_brightness(current_brightness);
+			}
 		}
 
         vTaskDelay(pdMS_TO_TICKS(50));
